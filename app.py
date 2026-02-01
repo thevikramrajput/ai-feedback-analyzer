@@ -623,6 +623,8 @@ def main():
         st.session_state.df = None
     if 'ai_report' not in st.session_state:
         st.session_state.ai_report = None
+    if 'analyzed' not in st.session_state:
+        st.session_state.analyzed = False
     
     # Sidebar
     with st.sidebar:
@@ -639,12 +641,13 @@ def main():
             if uploaded_file:
                 st.session_state.df = pd.read_csv(uploaded_file)
                 st.session_state.ai_report = None
-                st.success(f"✅ {len(st.session_state.df):,} reviews")
+                st.session_state.analyzed = False
+                st.success(f"✅ {len(st.session_state.df):,} reviews loaded")
         else:
             if st.session_state.df is None:
                 st.session_state.df = load_sample_data()
             if st.session_state.df is not None:
-                st.success(f"✅ {len(st.session_state.df):,} reviews")
+                st.success(f"✅ {len(st.session_state.df):,} reviews ready")
         
         st.divider()
         
@@ -657,13 +660,21 @@ def main():
             app_filter = st.selectbox("App", apps)
         
         st.divider()
-        st.caption("v2.0 - Powered by DistilBART")
+        
+        # Analyze Button
+        if st.session_state.df is not None:
+            if st.button("🚀 Start Analysis", type="primary", use_container_width=True):
+                st.session_state.analyzed = True
+                st.rerun()
+        
+        st.divider()
+        st.caption("v2.1 - Powered by T5")
     
     # Main content
     df = st.session_state.df
     
-    if df is not None:
-        with st.spinner("🔍 Analyzing..."):
+    if df is not None and st.session_state.analyzed:
+        with st.spinner("🔍 Analyzing reviews..."):
             results = process_data(df, sentiment_filter, app_filter)
         
         if results:
@@ -717,9 +728,21 @@ def main():
                     st.success(f"Showing all {len(display_df)} reviews")
                 else:
                     st.info("No reviews match the current filter.")
+    elif df is not None and not st.session_state.analyzed:
+        # Show welcome message before analysis
+        st.markdown("""
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+                    padding: 3rem; border-radius: 16px; text-align: center; margin: 2rem 0;">
+            <h2 style="color: #3b82f6; margin: 0;">👈 Click "Start Analysis" to Begin</h2>
+            <p style="color: #94a3b8; margin: 1rem 0 0 0; font-size: 1.1rem;">
+                Select your data source and filters, then click the button in the sidebar to analyze your reviews.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
     else:
         st.info("👈 Select a data source to get started!")
 
 
 if __name__ == "__main__":
     main()
+

@@ -34,20 +34,6 @@ st.markdown("""
     h2, h3 { color: #f8fafc !important; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    .ai-summary-box {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        padding: 2rem;
-        border-radius: 16px;
-        border: 1px solid #334155;
-        margin: 1rem 0;
-    }
-    .summary-section {
-        background: #1e293b;
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin: 1rem 0;
-        border-left: 4px solid #3b82f6;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -59,116 +45,126 @@ def load_summarizer():
     """Load the summarization model (cached)."""
     try:
         from transformers import pipeline
-        # Using a smaller, faster model for HF Spaces
         summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)
         return summarizer
+    except Exception as e:
+        st.warning(f"AI Model not available: {e}")
+        return None
+
+
+def summarize_text(text, summarizer, max_len=150, min_len=40):
+    """Generate summary for given text."""
+    if not summarizer or not text or len(text.strip()) < 100:
+        return None
+    
+    try:
+        # Truncate to model limit
+        text = text[:1024]
+        result = summarizer(text, max_length=max_len, min_length=min_len, do_sample=False)
+        return result[0]['summary_text']
     except Exception as e:
         return None
 
 
-def generate_category_summary(texts, category_name, summarizer):
-    """Generate summary for a specific category of reviews."""
-    if not texts or not summarizer:
-        return None
+def generate_detailed_ai_summary(df, cluster_info, summarizer):
+    """Generate comprehensive AI summary by actually reading the reviews."""
     
-    try:
-        # Combine texts (limit to avoid token limits)
-        combined_text = " ".join([str(t)[:200] for t in texts[:30]])
-        if len(combined_text) < 50:
-            return None
-        
-        # Truncate to model limits
-        combined_text = combined_text[:1024]
-        
-        summary = summarizer(combined_text, max_length=100, min_length=30, do_sample=False)
-        return summary[0]['summary_text']
-    except:
-        return None
-
-
-def generate_complete_ai_summary(df, cluster_info, summarizer):
-    """Generate a complete AI-powered summary of all reviews."""
-    summary_report = {
-        'executive_summary': '',
-        'areas_to_improve': [],
-        'feature_requests': '',
-        'critical_bugs': '',
-        'login_issues': '',
-        'messaging_issues': '',
-        'positive_feedback': '',
-        'recommendations': []
+    report = {
+        'overall_summary': '',
+        'negative_summary': '',
+        'positive_summary': '',
+        'login_summary': '',
+        'bugs_summary': '',
+        'features_summary': '',
+        'messaging_summary': '',
+        'top_complaints': [],
+        'top_praises': [],
+        'action_items': []
     }
     
-    # Generate category-specific summaries
-    category_mapping = {
-        'Login/Account Issues': 'login_issues',
-        'Performance/Bugs': 'critical_bugs',
-        'Feature Requests': 'feature_requests',
-        'Notifications/Messaging': 'messaging_issues'
+    # 1. OVERALL SUMMARY - Combine sample reviews
+    all_reviews = df['content'].astype(str).tolist()[:50]
+    combined_all = " | ".join([r[:150] for r in all_reviews if len(r) > 20])
+    
+    if summarizer and combined_all:
+        report['overall_summary'] = summarize_text(
+            f"User reviews summary: {combined_all}", 
+            summarizer, max_len=200, min_len=50
+        ) or "Could not generate overall summary."
+    
+    # 2. NEGATIVE REVIEWS SUMMARY - What users are complaining about
+    negative_df = df[df['sentiment'] == 'negative'] if 'sentiment' in df.columns else pd.DataFrame()
+    if len(negative_df) > 0:
+        neg_reviews = negative_df['content'].astype(str).tolist()[:40]
+        combined_neg = " | ".join([r[:150] for r in neg_reviews if len(r) > 20])
+        
+        if summarizer and combined_neg:
+            report['negative_summary'] = summarize_text(
+                f"Users are complaining that: {combined_neg}",
+                summarizer, max_len=200, min_len=50
+            ) or "Could not generate negative summary."
+        
+        # Extract actual complaints as quotes
+        for review in neg_reviews[:5]:
+            if len(review) > 30:
+                report['top_complaints'].append(review[:200])
+    
+    # 3. POSITIVE REVIEWS SUMMARY - What users love
+    positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
+    if len(positive_df) > 0:
+        pos_reviews = positive_df['content'].astype(str).tolist()[:30]
+        combined_pos = " | ".join([r[:150] for r in pos_reviews if len(r) > 20])
+        
+        if summarizer and combined_pos:
+            report['positive_summary'] = summarize_text(
+                f"Users love that: {combined_pos}",
+                summarizer, max_len=150, min_len=40
+            ) or "Could not generate positive summary."
+        
+        # Extract actual praises
+        for review in pos_reviews[:3]:
+            if len(review) > 30:
+                report['top_praises'].append(review[:200])
+    
+    # 4. CATEGORY-SPECIFIC SUMMARIES
+    category_labels = {
+        'Login/Account Issues': 'login_summary',
+        'Performance/Bugs': 'bugs_summary',
+        'Feature Requests': 'features_summary',
+        'Notifications/Messaging': 'messaging_summary'
     }
     
     for cluster_id, info in cluster_info.items():
         label = info.get('label', '')
-        texts = info.get('all_texts', info.get('sample_texts', []))
-        
-        if label in category_mapping and texts:
-            key = category_mapping[label]
-            if summarizer:
-                ai_summary = generate_category_summary(texts, label, summarizer)
-                if ai_summary:
-                    summary_report[key] = ai_summary
-            
-            # Fallback: Generate rule-based summary
-            if not summary_report[key]:
-                keywords = info.get('keywords', [])
-                count = info.get('count', 0)
-                summary_report[key] = f"Found {count} reviews mentioning: {', '.join(keywords[:5])}"
+        if label in category_labels:
+            texts = info.get('all_texts', info.get('sample_texts', []))
+            if texts:
+                # Get ORIGINAL reviews (not cleaned) for better summary
+                combined = " | ".join([str(t)[:150] for t in texts[:25] if len(str(t)) > 20])
+                
+                if summarizer and combined:
+                    key = category_labels[label]
+                    prompt = {
+                        'login_summary': f"Users report login and account problems: {combined}",
+                        'bugs_summary': f"Users report bugs and performance issues: {combined}",
+                        'features_summary': f"Users are requesting these features: {combined}",
+                        'messaging_summary': f"Users complain about messaging and notifications: {combined}"
+                    }
+                    report[key] = summarize_text(
+                        prompt.get(key, combined),
+                        summarizer, max_len=150, min_len=40
+                    ) or f"Found {len(texts)} reviews about {label}"
     
-    # Generate positive feedback summary
-    positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
-    if len(positive_df) > 0 and 'cleaned_content' in positive_df.columns:
-        pos_texts = positive_df['cleaned_content'].tolist()[:20]
-        if summarizer:
-            pos_summary = generate_category_summary(pos_texts, 'Positive', summarizer)
-            if pos_summary:
-                summary_report['positive_feedback'] = pos_summary
-        
-        if not summary_report['positive_feedback']:
-            pos_keywords = extract_keywords(pos_texts, top_n=8)
-            summary_report['positive_feedback'] = f"Users appreciate: {', '.join(pos_keywords)}"
+    # 5. ACTION ITEMS based on actual review content
+    if report['negative_summary']:
+        report['action_items'].append(f"🔴 Address user complaints: {report['negative_summary'][:200]}")
     
-    # Executive Summary
-    total = len(df)
-    neg_count = len(df[df['sentiment'] == 'negative']) if 'sentiment' in df.columns else 0
-    pos_count = len(df[df['sentiment'] == 'positive']) if 'sentiment' in df.columns else 0
+    for label, key in category_labels.items():
+        if report.get(key):
+            icon = {'login_summary': '🔐', 'bugs_summary': '🐛', 'features_summary': '✨', 'messaging_summary': '💬'}.get(key, '📌')
+            report['action_items'].append(f"{icon} {label}: {report[key][:150]}...")
     
-    summary_report['executive_summary'] = f"""
-    Analyzed {total:,} user reviews. {round(pos_count/total*100, 1)}% positive, {round(neg_count/total*100, 1)}% negative.
-    Top complaint categories identified and summarized below.
-    """
-    
-    # Areas to improve based on clusters
-    sorted_clusters = sorted(cluster_info.values(), key=lambda x: x.get('count', 0), reverse=True)
-    for cluster in sorted_clusters[:4]:
-        count = cluster.get('count', 0)
-        label = cluster.get('label', 'Unknown')
-        keywords = cluster.get('keywords', [])
-        summary_report['areas_to_improve'].append({
-            'area': label,
-            'count': count,
-            'keywords': keywords
-        })
-    
-    # Recommendations
-    summary_report['recommendations'] = [
-        "🔐 **Account & Login**: Simplify authentication flow, reduce ban false-positives" if summary_report.get('login_issues') else None,
-        "⚡ **Performance**: Optimize app speed, fix crash issues, reduce memory usage" if summary_report.get('critical_bugs') else None,
-        "✨ **Features**: Prioritize most-requested features based on user feedback" if summary_report.get('feature_requests') else None,
-        "💬 **Messaging**: Improve notification reliability and message sync" if summary_report.get('messaging_issues') else None,
-    ]
-    summary_report['recommendations'] = [r for r in summary_report['recommendations'] if r]
-    
-    return summary_report
+    return report
 
 
 # ============== DATA PROCESSING FUNCTIONS ==============
@@ -203,8 +199,8 @@ def extract_keywords(texts, top_n=5):
     stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
                  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
                  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'it', 'its',
-                 'this', 'that', 'i', 'me', 'my', 'you', 'your', 'we', 'they', 'app', 'good', 'bad',
-                 'not', 'just', 'very', 'much', 'really', 'can', 'get', 'use', 'using', 'one'}
+                 'this', 'that', 'i', 'me', 'my', 'you', 'your', 'we', 'they', 'app',
+                 'not', 'just', 'very', 'much', 'really', 'can', 'get', 'use', 'one'}
     
     word_counts = Counter()
     for text in texts:
@@ -214,9 +210,9 @@ def extract_keywords(texts, top_n=5):
     return [word for word, _ in word_counts.most_common(top_n)]
 
 
-def simple_cluster(texts, n_clusters=6):
-    """Simple keyword-based clustering."""
-    clusters = {i: [] for i in range(n_clusters)}
+def simple_cluster(texts, original_reviews, n_clusters=6):
+    """Simple keyword-based clustering. Returns both cleaned and original texts."""
+    clusters = {i: {'cleaned': [], 'original': []} for i in range(n_clusters)}
     
     issue_keywords = [
         ['login', 'account', 'password', 'sign', 'ban', 'banned', 'block', 'access'],
@@ -227,29 +223,33 @@ def simple_cluster(texts, n_clusters=6):
         ['feature', 'need', 'want', 'please', 'add', 'missing', 'wish']
     ]
     
-    for text in texts:
+    for i, text in enumerate(texts):
         text_lower = str(text).lower()
+        orig = original_reviews[i] if i < len(original_reviews) else text
         assigned = False
         for cluster_id, keywords in enumerate(issue_keywords):
             if any(kw in text_lower for kw in keywords):
-                clusters[cluster_id].append(text)
+                clusters[cluster_id]['cleaned'].append(text)
+                clusters[cluster_id]['original'].append(orig)
                 assigned = True
                 break
         if not assigned:
-            clusters[n_clusters - 1].append(text)
+            clusters[n_clusters - 1]['cleaned'].append(text)
+            clusters[n_clusters - 1]['original'].append(orig)
     
     cluster_info = {}
     labels = ['Login/Account Issues', 'Performance/Bugs', 'Updates/Installation',
               'Notifications/Messaging', 'Ads/Spam/Privacy', 'Feature Requests']
     
     for i in range(n_clusters):
-        if clusters[i]:
+        if clusters[i]['cleaned']:
             cluster_info[i] = {
                 'label': labels[i] if i < len(labels) else f'Topic {i}',
-                'keywords': extract_keywords(clusters[i]),
-                'count': len(clusters[i]),
-                'sample_texts': clusters[i][:10],
-                'all_texts': clusters[i]
+                'keywords': extract_keywords(clusters[i]['cleaned']),
+                'count': len(clusters[i]['cleaned']),
+                'sample_texts': clusters[i]['cleaned'][:10],
+                'all_texts': clusters[i]['cleaned'],
+                'original_texts': clusters[i]['original']  # Keep original for summary
             }
     
     return cluster_info
@@ -292,7 +292,12 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
         display_df = df[df['sentiment'] == sentiment_filter.lower()].copy()
     
     negative_df = df[df['sentiment'] == 'negative']
-    cluster_info = simple_cluster(negative_df['cleaned_content'].tolist()) if len(negative_df) > 0 else {}
+    
+    # Pass both cleaned and original texts
+    cluster_info = simple_cluster(
+        negative_df['cleaned_content'].tolist(),
+        negative_df['content'].tolist()
+    ) if len(negative_df) > 0 else {}
     
     summary = {
         'total_reviews': total,
@@ -358,8 +363,7 @@ def render_kpi_cards(summary):
     with col1:
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;
-                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
+                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
             <div style="font-size: 2.5rem; font-weight: 700;">{summary.get('total_reviews', 0):,}</div>
             <div style="font-size: 0.9rem; opacity: 0.9;">📝 Total Reviews</div>
         </div>
@@ -368,8 +372,7 @@ def render_kpi_cards(summary):
     with col2:
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;
-                    box-shadow: 0 4px 15px rgba(56, 239, 125, 0.4);">
+                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
             <div style="font-size: 2.5rem; font-weight: 700;">{summary.get('positive_percentage', 0)}%</div>
             <div style="font-size: 0.9rem; opacity: 0.9;">😊 Positive</div>
         </div>
@@ -378,8 +381,7 @@ def render_kpi_cards(summary):
     with col3:
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;
-                    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);">
+                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
             <div style="font-size: 2.5rem; font-weight: 700;">{summary.get('negative_percentage', 0)}%</div>
             <div style="font-size: 0.9rem; opacity: 0.9;">😟 Negative</div>
         </div>
@@ -390,8 +392,7 @@ def render_kpi_cards(summary):
         color = "#11998e" if health >= 70 else "#f5576c" if health < 50 else "#ffa726"
         st.markdown(f"""
         <div style="background: linear-gradient(135deg, {color} 0%, #ffffff22 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
             <div style="font-size: 2.5rem; font-weight: 700;">{health}%</div>
             <div style="font-size: 0.9rem; opacity: 0.9;">💪 Health Score</div>
         </div>
@@ -449,125 +450,113 @@ def render_issues_chart(top_issues):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_ai_summary(summary_report):
-    """Render the complete AI-generated summary."""
+def render_ai_summary(report):
+    """Render the detailed AI summary showing what users actually said."""
     st.markdown("---")
-    st.subheader("🤖 AI-Generated Comprehensive Summary")
+    st.header("🤖 AI-Generated Review Summary")
+    st.caption("Based on analysis of actual user reviews")
     
-    # Executive Summary
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-                padding: 1.5rem; border-radius: 12px; border: 1px solid #3b82f6; margin-bottom: 1rem;">
-        <h4 style="color: #3b82f6; margin-top: 0;">📋 Executive Summary</h4>
-        <p style="color: #e2e8f0;">{summary_report.get('executive_summary', 'No summary available.')}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Overall Summary
+    if report.get('overall_summary'):
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+                    padding: 1.5rem; border-radius: 12px; border-left: 5px solid #3b82f6; margin: 1rem 0;">
+            <h4 style="color: #3b82f6; margin: 0;">📋 Overall Summary</h4>
+            <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 1.1rem; line-height: 1.6;">
+                {report['overall_summary']}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
     
-    # Create tabs for different sections
-    tab1, tab2, tab3, tab4 = st.tabs(["� Areas to Improve", "💬 Category Summaries", "✅ Positive Feedback", "💡 Recommendations"])
+    # Two columns for Negative and Positive
+    col1, col2 = st.columns(2)
     
-    with tab1:
-        areas = summary_report.get('areas_to_improve', [])
-        if areas:
-            for area in areas:
-                st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                            border-left: 4px solid #f5576c;">
-                    <strong style="color: #f5576c;">{area['area']}</strong>
-                    <span style="color: #94a3b8; float: right;">{area['count']} complaints</span>
-                    <p style="color: #94a3b8; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                        Keywords: {', '.join(area['keywords'][:5])}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            st.info("No specific areas to improve identified.")
-    
-    with tab2:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Login Issues
-            if summary_report.get('login_issues'):
-                st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                            border-left: 4px solid #ef4444;">
-                    <h5 style="color: #ef4444; margin: 0;">🔐 Login/Account Issues</h5>
-                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                        {summary_report['login_issues']}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Bugs
-            if summary_report.get('critical_bugs'):
-                st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                            border-left: 4px solid #f97316;">
-                    <h5 style="color: #f97316; margin: 0;">🐛 Performance/Bugs</h5>
-                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                        {summary_report['critical_bugs']}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        with col2:
-            # Feature Requests
-            if summary_report.get('feature_requests'):
-                st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                            border-left: 4px solid #a855f7;">
-                    <h5 style="color: #a855f7; margin: 0;">✨ Feature Requests</h5>
-                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                        {summary_report['feature_requests']}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Messaging
-            if summary_report.get('messaging_issues'):
-                st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                            border-left: 4px solid #06b6d4;">
-                    <h5 style="color: #06b6d4; margin: 0;">💬 Messaging Issues</h5>
-                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                        {summary_report['messaging_issues']}
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    with tab3:
-        if summary_report.get('positive_feedback'):
+    with col1:
+        st.markdown("### 😟 What Users Are Complaining About")
+        if report.get('negative_summary'):
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
-                        padding: 1.5rem; border-radius: 12px; border: 1px solid #10b981;">
-                <h5 style="color: #10b981; margin: 0;">😊 What Users Love</h5>
-                <p style="color: #e2e8f0; margin: 0.5rem 0 0 0;">
-                    {summary_report['positive_feedback']}
+            <div style="background: #1e293b; padding: 1rem; border-radius: 10px; border-left: 4px solid #ef4444;">
+                <p style="color: #fca5a5; margin: 0; font-size: 1rem; line-height: 1.5;">
+                    {report['negative_summary']}
                 </p>
             </div>
             """, unsafe_allow_html=True)
-        else:
-            st.info("No positive feedback summary available.")
-    
-    with tab4:
-        recommendations = summary_report.get('recommendations', [])
-        if recommendations:
-            for rec in recommendations:
+        
+        # Show actual complaint quotes
+        if report.get('top_complaints'):
+            st.markdown("**💬 Sample User Complaints:**")
+            for i, complaint in enumerate(report['top_complaints'][:3], 1):
                 st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                            border-left: 4px solid #3b82f6;">
-                    <p style="color: #e2e8f0; margin: 0;">{rec}</p>
+                <div style="background: #292524; padding: 0.8rem; border-radius: 8px; margin: 0.3rem 0;
+                            border-left: 3px solid #f87171; font-style: italic;">
+                    <span style="color: #d6d3d1;">"{complaint}"</span>
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            st.success("No critical recommendations at this time.")
+    
+    with col2:
+        st.markdown("### 😊 What Users Love About the App")
+        if report.get('positive_summary'):
+            st.markdown(f"""
+            <div style="background: #1e293b; padding: 1rem; border-radius: 10px; border-left: 4px solid #22c55e;">
+                <p style="color: #86efac; margin: 0; font-size: 1rem; line-height: 1.5;">
+                    {report['positive_summary']}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Show actual praise quotes
+        if report.get('top_praises'):
+            st.markdown("**💬 Sample User Praises:**")
+            for i, praise in enumerate(report['top_praises'][:3], 1):
+                st.markdown(f"""
+                <div style="background: #1a2e1a; padding: 0.8rem; border-radius: 8px; margin: 0.3rem 0;
+                            border-left: 3px solid #4ade80; font-style: italic;">
+                    <span style="color: #d6d3d1;">"{praise}"</span>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Category-wise summaries
+    st.markdown("### 📂 Category-Wise Summary (What Users Said)")
+    
+    categories = [
+        ('🔐 Login/Account Issues', report.get('login_summary'), '#ef4444'),
+        ('🐛 Bugs & Performance', report.get('bugs_summary'), '#f97316'),
+        ('✨ Feature Requests', report.get('features_summary'), '#a855f7'),
+        ('💬 Messaging Issues', report.get('messaging_summary'), '#06b6d4'),
+    ]
+    
+    cols = st.columns(2)
+    for i, (title, summary, color) in enumerate(categories):
+        if summary:
+            with cols[i % 2]:
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 10px; 
+                            border-left: 4px solid {color}; margin: 0.5rem 0; min-height: 120px;">
+                    <h5 style="color: {color}; margin: 0 0 0.5rem 0;">{title}</h5>
+                    <p style="color: #cbd5e1; margin: 0; font-size: 0.95rem; line-height: 1.5;">
+                        {summary}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Action Items
+    if report.get('action_items'):
+        st.markdown("---")
+        st.markdown("### 🎯 Key Action Items (Based on User Feedback)")
+        for item in report['action_items'][:5]:
+            st.markdown(f"""
+            <div style="background: #1e293b; padding: 0.8rem 1rem; border-radius: 8px; margin: 0.3rem 0;
+                        border-left: 4px solid #3b82f6;">
+                <span style="color: #e2e8f0;">{item}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 def render_category_details(top_issues):
     """Render expandable sections for each category with reviews."""
     st.subheader("📂 Reviews by Category")
-    st.caption("Click on a category to view its reviews")
     
     if not top_issues:
         st.info("No categories found.")
@@ -587,7 +576,7 @@ def render_category_details(top_issues):
         icon = icons.get(label, '📌')
         count = issue.get('count', 0)
         keywords = issue.get('keywords', [])
-        all_texts = issue.get('all_texts', issue.get('sample_texts', []))
+        all_texts = issue.get('original_texts', issue.get('all_texts', []))
         
         with st.expander(f"{icon} {label} ({count} reviews)", expanded=False):
             if keywords:
@@ -603,9 +592,7 @@ def render_category_details(top_issues):
                 st.dataframe(reviews_df, use_container_width=True, hide_index=True)
                 
                 if len(all_texts) > 20:
-                    st.caption(f"Showing 20 of {len(all_texts)} reviews in this category")
-            else:
-                st.info("No reviews available")
+                    st.caption(f"Showing 20 of {len(all_texts)} reviews")
 
 
 # ============== MAIN APP ==============
@@ -615,8 +602,8 @@ def main():
     
     if 'df' not in st.session_state:
         st.session_state.df = None
-    if 'ai_summary' not in st.session_state:
-        st.session_state.ai_summary = None
+    if 'ai_report' not in st.session_state:
+        st.session_state.ai_report = None
     
     # Sidebar
     with st.sidebar:
@@ -629,27 +616,21 @@ def main():
         )
         
         if data_source == "📤 Upload CSV":
-            uploaded_file = st.file_uploader("Upload CSV with reviews", type=['csv'])
+            uploaded_file = st.file_uploader("Upload CSV", type=['csv'])
             if uploaded_file:
                 st.session_state.df = pd.read_csv(uploaded_file)
-                st.session_state.ai_summary = None  # Reset summary
-                st.success(f"✅ Uploaded {len(st.session_state.df):,} reviews")
+                st.session_state.ai_report = None
+                st.success(f"✅ {len(st.session_state.df):,} reviews")
         else:
             if st.session_state.df is None:
                 st.session_state.df = load_sample_data()
             if st.session_state.df is not None:
-                st.success(f"✅ Loaded {len(st.session_state.df):,} sample reviews")
-            else:
-                st.warning("Sample data not found")
+                st.success(f"✅ {len(st.session_state.df):,} reviews")
         
         st.divider()
         
         st.subheader("🔍 Filters")
-        
-        sentiment_filter = st.selectbox(
-            "Sentiment",
-            ["All", "Positive", "Neutral", "Negative"]
-        )
+        sentiment_filter = st.selectbox("Sentiment", ["All", "Positive", "Neutral", "Negative"])
         
         app_filter = "All"
         if st.session_state.df is not None and 'app_id' in st.session_state.df.columns:
@@ -657,67 +638,52 @@ def main():
             app_filter = st.selectbox("App", apps)
         
         st.divider()
-        st.caption("AI Product Feedback Analyzer v2.0")
-        st.caption("🤖 Powered by DistilBART")
+        st.caption("v2.0 - Powered by DistilBART")
     
     # Main content
     df = st.session_state.df
     
     if df is not None:
-        with st.spinner("🔍 Analyzing reviews..."):
+        with st.spinner("🔍 Analyzing..."):
             results = process_data(df, sentiment_filter, app_filter)
         
         if results:
-            if sentiment_filter != "All" or app_filter != "All":
-                st.info(f"📌 Showing {results['filtered_count']:,} reviews | Filters: Sentiment={sentiment_filter}, App={app_filter}")
-            
-            # KPI Cards
             render_kpi_cards(results['summary'])
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Charts
             col1, col2 = st.columns(2)
             with col1:
                 render_sentiment_chart(results['summary'])
             with col2:
                 render_issues_chart(results['top_issues'])
             
-            # AI Summary Generation Button
+            # AI Summary Button
             st.markdown("---")
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
-                if st.button("🤖 Generate AI Summary", type="primary", use_container_width=True):
-                    with st.spinner("🧠 AI is analyzing all reviews... This may take a minute..."):
+                if st.button("🤖 Generate Detailed AI Summary", type="primary", use_container_width=True):
+                    with st.spinner("🧠 Reading all reviews and generating summary... Please wait..."):
                         summarizer = load_summarizer()
-                        ai_summary = generate_complete_ai_summary(
-                            results['processed_df'], 
-                            results['cluster_info'], 
+                        report = generate_detailed_ai_summary(
+                            results['processed_df'],
+                            results['cluster_info'],
                             summarizer
                         )
-                        st.session_state.ai_summary = ai_summary
+                        st.session_state.ai_report = report
             
-            # Display AI Summary if generated
-            if st.session_state.ai_summary:
-                render_ai_summary(st.session_state.ai_summary)
+            # Display AI Summary
+            if st.session_state.ai_report:
+                render_ai_summary(st.session_state.ai_report)
             
             st.divider()
-            
-            # Category Details
             render_category_details(results['top_issues'])
             
             st.divider()
-            
-            # Sample reviews table
             st.subheader(f"📋 Sample Reviews ({sentiment_filter})")
             if results['sample_complaints']:
-                complaints_df = pd.DataFrame(results['sample_complaints'])
-                st.dataframe(complaints_df, use_container_width=True, hide_index=True)
-            else:
-                st.info("No reviews match the current filters.")
-        else:
-            st.error("Could not process data. Ensure CSV has 'content' and 'score' columns.")
+                st.dataframe(pd.DataFrame(results['sample_complaints']), use_container_width=True, hide_index=True)
     else:
-        st.info("👈 Select a data source from the sidebar to get started!")
+        st.info("👈 Select a data source to get started!")
 
 
 if __name__ == "__main__":

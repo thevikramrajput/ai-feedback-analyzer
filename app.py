@@ -1,6 +1,6 @@
 """
 AI Product Feedback Analyzer - Streamlit Dashboard
-Version: 5.0 - Dark Elegant UI
+Version: 6.0 - Luna Blue UI
 """
 
 import streamlit as st
@@ -10,14 +10,13 @@ import re
 import os
 from collections import Counter
 
-# ============== COLOR PALETTE ==============
+# ============== LUNA COLOR PALETTE ==============
 COLORS = {
-    'maroon': '#380F17',      # Primary background / header
-    'red': '#8F0B13',          # Primary accent & buttons
-    'cream': '#EFDFC5',        # Cards & content areas
-    'charcoal': '#252B2B',     # Secondary background
-    'gray': '#4C4F54',         # Borders, secondary text
-    'cream_dark': '#d4c4a8',   # Slightly darker cream for contrast
+    'light_cyan': '#A7EBF2',    # Light accent, highlights
+    'teal': '#54ACBF',          # Primary buttons, accents
+    'blue': '#26658C',          # Secondary elements
+    'dark_blue': '#023859',     # Cards, content areas
+    'navy': '#011C40',          # Primary background
 }
 
 # Page configuration
@@ -28,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ============== DARK ELEGANT CSS ==============
+# ============== LUNA BLUE CSS ==============
 st.markdown(f"""
 <style>
     /* Import Google Font */
@@ -36,23 +35,20 @@ st.markdown(f"""
     
     /* Main Background */
     .stApp {{
-        background-color: {COLORS['charcoal']};
+        background-color: {COLORS['navy']};
         font-family: 'Inter', 'Segoe UI', sans-serif;
     }}
     
     /* Sidebar */
     [data-testid="stSidebar"] {{
-        background-color: {COLORS['maroon']} !important;
+        background-color: {COLORS['dark_blue']} !important;
     }}
     [data-testid="stSidebar"] * {{
-        color: {COLORS['cream']} !important;
+        color: {COLORS['light_cyan']} !important;
     }}
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
-        color: {COLORS['cream']} !important;
+        color: {COLORS['light_cyan']} !important;
         font-weight: 600;
-    }}
-    [data-testid="stSidebar"] .stRadio label {{
-        color: {COLORS['cream']} !important;
     }}
     
     /* Hide Streamlit defaults */
@@ -62,48 +58,51 @@ st.markdown(f"""
     
     /* Hero Header */
     .hero-card {{
-        background-color: {COLORS['maroon']};
+        background-color: {COLORS['dark_blue']};
         padding: 2.5rem 3rem;
         border-radius: 16px;
         text-align: center;
         margin-bottom: 2rem;
-        border: 1px solid {COLORS['gray']};
+        border: 1px solid {COLORS['blue']};
+        box-shadow: 0 8px 32px rgba(1, 28, 64, 0.5);
     }}
     .hero-card h1 {{
-        color: {COLORS['cream']};
+        color: {COLORS['light_cyan']};
         font-size: 2.8rem;
         font-weight: 700;
         margin: 0;
         letter-spacing: -0.5px;
     }}
     .hero-card p {{
-        color: {COLORS['gray']};
+        color: {COLORS['teal']};
         font-size: 1.15rem;
         margin: 0.8rem 0 0 0;
     }}
     
     /* KPI Cards */
     .kpi-card {{
-        background-color: {COLORS['cream']};
+        background-color: {COLORS['dark_blue']};
         padding: 1.8rem 1.5rem;
         border-radius: 14px;
         text-align: center;
-        border: 1px solid {COLORS['cream_dark']};
+        border: 1px solid {COLORS['blue']};
         transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(1, 28, 64, 0.4);
     }}
     .kpi-card:hover {{
         transform: translateY(-4px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        border-color: {COLORS['teal']};
+        box-shadow: 0 8px 32px rgba(84, 172, 191, 0.2);
     }}
     .kpi-value {{
         font-size: 2.8rem;
         font-weight: 700;
-        color: {COLORS['maroon']};
+        color: {COLORS['light_cyan']};
         line-height: 1;
     }}
     .kpi-label {{
         font-size: 0.95rem;
-        color: {COLORS['gray']};
+        color: {COLORS['teal']};
         margin-top: 0.6rem;
         font-weight: 500;
     }}
@@ -114,64 +113,67 @@ st.markdown(f"""
     
     /* Section Cards */
     .section-card {{
-        background-color: {COLORS['cream']};
+        background-color: {COLORS['dark_blue']};
         padding: 1.8rem;
         border-radius: 14px;
-        border: 1px solid {COLORS['cream_dark']};
+        border: 1px solid {COLORS['blue']};
         margin: 1rem 0;
+        box-shadow: 0 4px 20px rgba(1, 28, 64, 0.4);
     }}
     .section-card h3 {{
-        color: {COLORS['maroon']} !important;
+        color: {COLORS['light_cyan']} !important;
         font-weight: 600;
         margin: 0 0 1rem 0;
     }}
     
     /* Summary Card */
     .summary-card {{
-        background-color: {COLORS['cream']};
+        background-color: {COLORS['dark_blue']};
         padding: 1.5rem;
         border-radius: 12px;
-        border-left: 4px solid {COLORS['red']};
+        border-left: 4px solid {COLORS['teal']};
         margin: 1rem 0;
+        border: 1px solid {COLORS['blue']};
     }}
     .summary-card h4 {{
-        color: {COLORS['maroon']};
+        color: {COLORS['light_cyan']};
         margin: 0 0 0.5rem 0;
         font-weight: 600;
     }}
     .summary-card p {{
-        color: {COLORS['gray']};
+        color: {COLORS['teal']};
         margin: 0;
         line-height: 1.6;
     }}
     
     /* Quote Card */
     .quote-card {{
-        background-color: {COLORS['charcoal']};
+        background-color: {COLORS['navy']};
         padding: 1rem 1.2rem;
         border-radius: 10px;
-        border-left: 3px solid {COLORS['red']};
+        border-left: 3px solid {COLORS['teal']};
         margin: 0.6rem 0;
         font-style: italic;
-        color: {COLORS['cream']};
+        color: {COLORS['light_cyan']};
         font-size: 0.95rem;
     }}
     
     /* Category Card */
     .category-card {{
-        background-color: {COLORS['cream']};
+        background-color: {COLORS['dark_blue']};
         padding: 1.2rem;
         border-radius: 12px;
-        border-left: 4px solid {COLORS['red']};
+        border-left: 4px solid {COLORS['teal']};
         margin: 0.8rem 0;
+        border: 1px solid {COLORS['blue']};
     }}
     .category-card h5 {{
-        color: {COLORS['maroon']};
+        color: {COLORS['light_cyan']};
         margin: 0 0 0.5rem 0;
         font-weight: 600;
     }}
     .category-card p {{
-        color: {COLORS['gray']};
+        color: {COLORS['teal']};
         margin: 0;
         font-size: 0.95rem;
         line-height: 1.5;
@@ -179,41 +181,43 @@ st.markdown(f"""
     
     /* Action Items */
     .action-item {{
-        background-color: {COLORS['cream']};
+        background-color: {COLORS['dark_blue']};
         padding: 1rem 1.2rem;
         border-radius: 10px;
-        border-left: 4px solid {COLORS['red']};
+        border-left: 4px solid {COLORS['teal']};
         margin: 0.5rem 0;
-        color: {COLORS['maroon']};
+        color: {COLORS['light_cyan']};
         font-weight: 500;
+        border: 1px solid {COLORS['blue']};
     }}
     
     /* Welcome Card */
     .welcome-card {{
-        background-color: {COLORS['maroon']};
+        background-color: {COLORS['dark_blue']};
         padding: 4rem 3rem;
         border-radius: 16px;
         text-align: center;
         margin: 3rem auto;
         max-width: 600px;
-        border: 1px solid {COLORS['gray']};
+        border: 1px solid {COLORS['blue']};
+        box-shadow: 0 8px 32px rgba(1, 28, 64, 0.5);
     }}
     .welcome-card h2 {{
-        color: {COLORS['cream']};
+        color: {COLORS['light_cyan']};
         font-size: 1.8rem;
         margin: 0;
         font-weight: 600;
     }}
     .welcome-card p {{
-        color: {COLORS['gray']};
+        color: {COLORS['teal']};
         margin: 1rem 0 0 0;
         font-size: 1.1rem;
     }}
     
     /* Buttons */
     .stButton > button {{
-        background-color: {COLORS['red']} !important;
-        color: {COLORS['cream']} !important;
+        background-color: {COLORS['teal']} !important;
+        color: {COLORS['navy']} !important;
         border: none !important;
         border-radius: 12px !important;
         padding: 0.8rem 1.8rem !important;
@@ -222,59 +226,60 @@ st.markdown(f"""
         transition: all 0.3s ease !important;
     }}
     .stButton > button:hover {{
-        background-color: {COLORS['maroon']} !important;
+        background-color: {COLORS['light_cyan']} !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(143, 11, 19, 0.4) !important;
+        box-shadow: 0 6px 20px rgba(84, 172, 191, 0.4) !important;
     }}
     
     /* Select boxes */
     .stSelectbox > div > div {{
-        background-color: {COLORS['charcoal']} !important;
-        border: 1px solid {COLORS['gray']} !important;
+        background-color: {COLORS['navy']} !important;
+        border: 1px solid {COLORS['blue']} !important;
         border-radius: 10px !important;
-        color: {COLORS['cream']} !important;
+        color: {COLORS['light_cyan']} !important;
     }}
     .stSelectbox label {{
-        color: {COLORS['cream']} !important;
+        color: {COLORS['light_cyan']} !important;
+    }}
+    
+    /* Radio buttons */
+    .stRadio label {{
+        color: {COLORS['light_cyan']} !important;
     }}
     
     /* File uploader */
     [data-testid="stFileUploader"] {{
-        background-color: {COLORS['charcoal']};
+        background-color: {COLORS['navy']};
         border-radius: 12px;
         padding: 1rem;
-        border: 2px dashed {COLORS['gray']};
+        border: 2px dashed {COLORS['blue']};
     }}
     [data-testid="stFileUploader"] * {{
-        color: {COLORS['cream']} !important;
+        color: {COLORS['light_cyan']} !important;
     }}
     
     /* Expanders */
     .streamlit-expanderHeader {{
-        background-color: {COLORS['cream']} !important;
+        background-color: {COLORS['dark_blue']} !important;
         border-radius: 10px !important;
-        color: {COLORS['maroon']} !important;
+        color: {COLORS['light_cyan']} !important;
         font-weight: 500;
+        border: 1px solid {COLORS['blue']} !important;
     }}
     
     /* Dataframes */
     [data-testid="stDataFrame"] {{
-        background-color: {COLORS['cream']};
+        background-color: {COLORS['dark_blue']};
         border-radius: 12px !important;
         overflow: hidden;
+        border: 1px solid {COLORS['blue']};
     }}
     
     /* Success/Info boxes */
-    .stSuccess {{
-        background-color: {COLORS['charcoal']} !important;
-        color: {COLORS['cream']} !important;
-        border: 1px solid {COLORS['gray']} !important;
-        border-radius: 10px !important;
-    }}
-    .stInfo {{
-        background-color: {COLORS['charcoal']} !important;
-        color: {COLORS['cream']} !important;
-        border: 1px solid {COLORS['gray']} !important;
+    .stSuccess, .stInfo {{
+        background-color: {COLORS['dark_blue']} !important;
+        color: {COLORS['light_cyan']} !important;
+        border: 1px solid {COLORS['teal']} !important;
         border-radius: 10px !important;
     }}
     
@@ -282,23 +287,28 @@ st.markdown(f"""
     hr {{
         border: none;
         height: 1px;
-        background-color: {COLORS['gray']};
+        background-color: {COLORS['blue']};
         margin: 2rem 0;
     }}
     
-    /* All headings in main area */
+    /* All headings */
     h1, h2, h3, h4, h5, h6 {{
-        color: {COLORS['cream']} !important;
+        color: {COLORS['light_cyan']} !important;
     }}
     
-    /* Main area text */
+    /* Main text */
     .stApp p, .stApp span, .stApp label {{
-        color: {COLORS['cream']};
+        color: {COLORS['teal']};
     }}
     
     /* Caption */
     .stCaption {{
-        color: {COLORS['gray']} !important;
+        color: {COLORS['blue']} !important;
+    }}
+    
+    /* Spinner */
+    .stSpinner > div {{
+        border-top-color: {COLORS['teal']} !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -534,24 +544,24 @@ def render_kpi_cards(summary):
 
 def render_sentiment_chart(summary):
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown(f"<h3 style='color: {COLORS['maroon']} !important;'>📊 Sentiment Distribution</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>📊 Sentiment Distribution</h3>", unsafe_allow_html=True)
     
     fig = go.Figure(data=[go.Pie(
         labels=['Positive', 'Neutral', 'Negative'],
         values=[summary.get('positive_count', 0), summary.get('neutral_count', 0), summary.get('negative_count', 0)],
         hole=0.45,
-        marker_colors=[COLORS['charcoal'], COLORS['gray'], COLORS['red']],
+        marker_colors=[COLORS['teal'], COLORS['blue'], COLORS['light_cyan']],
         textinfo='label+percent',
-        textfont=dict(color=COLORS['cream'], size=13, family='Inter')
+        textfont=dict(color=COLORS['navy'], size=13, family='Inter')
     )])
-    fig.update_layout(showlegend=True, legend=dict(font=dict(color=COLORS['maroon'], size=12)),
+    fig.update_layout(showlegend=True, legend=dict(font=dict(color=COLORS['light_cyan'], size=12)),
                      margin=dict(t=10, b=10, l=10, r=10), height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 def render_issues_chart(top_issues):
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown(f"<h3 style='color: {COLORS['maroon']} !important;'>🎯 Top Complaint Categories</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>🎯 Top Complaint Categories</h3>", unsafe_allow_html=True)
     
     if not top_issues:
         st.info("No issues found.")
@@ -560,41 +570,41 @@ def render_issues_chart(top_issues):
     
     labels = [issue.get('label', 'Unknown')[:20] for issue in top_issues]
     counts = [issue.get('count', 0) for issue in top_issues]
-    colors = [COLORS['red'], COLORS['maroon'], COLORS['gray'], COLORS['charcoal'], COLORS['red'], COLORS['maroon']]
+    colors = [COLORS['light_cyan'], COLORS['teal'], COLORS['blue'], COLORS['dark_blue'], COLORS['teal'], COLORS['light_cyan']]
     
     fig = go.Figure(data=[go.Bar(
         x=counts, y=labels, orientation='h', marker=dict(color=colors[:len(labels)], line=dict(width=0)),
-        text=counts, textposition='outside', textfont=dict(color=COLORS['maroon'], size=12, family='Inter')
+        text=counts, textposition='outside', textfont=dict(color=COLORS['light_cyan'], size=12, family='Inter')
     )])
-    fig.update_layout(xaxis=dict(tickfont=dict(color=COLORS['gray']), showgrid=False),
-                     yaxis=dict(autorange="reversed", tickfont=dict(color=COLORS['maroon'], size=11)),
+    fig.update_layout(xaxis=dict(tickfont=dict(color=COLORS['teal']), showgrid=False),
+                     yaxis=dict(autorange="reversed", tickfont=dict(color=COLORS['light_cyan'], size=11)),
                      margin=dict(t=10, b=30, l=130, r=50), height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 def render_ai_summary(report):
     st.markdown("---")
-    st.markdown(f"<h2 style='color: {COLORS['cream']};'>🤖 AI-Generated Insights</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>🤖 AI-Generated Insights</h2>", unsafe_allow_html=True)
     
     if report.get('overall_summary'):
         st.markdown(f"""<div class="summary-card"><h4>📋 Overall Summary</h4><p>{report['overall_summary']}</p></div>""", unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     with col1:
-        st.markdown(f"<h4 style='color: {COLORS['cream']};'>😟 User Complaints</h4>", unsafe_allow_html=True)
+        st.markdown("<h4>😟 User Complaints</h4>", unsafe_allow_html=True)
         if report.get('negative_summary'):
             st.markdown(f"""<div class="category-card"><p>{report['negative_summary']}</p></div>""", unsafe_allow_html=True)
         for c in report.get('top_complaints', [])[:2]:
             st.markdown(f"""<div class="quote-card">"{c}"</div>""", unsafe_allow_html=True)
     
     with col2:
-        st.markdown(f"<h4 style='color: {COLORS['cream']};'>😊 User Praises</h4>", unsafe_allow_html=True)
+        st.markdown("<h4>😊 User Praises</h4>", unsafe_allow_html=True)
         if report.get('positive_summary'):
-            st.markdown(f"""<div class="category-card" style="border-left-color: {COLORS['charcoal']};"><p>{report['positive_summary']}</p></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="category-card"><p>{report['positive_summary']}</p></div>""", unsafe_allow_html=True)
         for p in report.get('top_praises', [])[:2]:
-            st.markdown(f"""<div class="quote-card" style="border-left-color: {COLORS['charcoal']};">"{p}"</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="quote-card">"{p}"</div>""", unsafe_allow_html=True)
     
-    st.markdown(f"<h4 style='color: {COLORS['cream']}; margin-top: 1.5rem;'>📂 Category Breakdown</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='margin-top: 1.5rem;'>📂 Category Breakdown</h4>", unsafe_allow_html=True)
     cats = [('🔐 Login', report.get('login_summary')), ('🐛 Bugs', report.get('bugs_summary')),
             ('✨ Features', report.get('features_summary')), ('💬 Messaging', report.get('messaging_summary'))]
     cols = st.columns(2)
@@ -604,13 +614,13 @@ def render_ai_summary(report):
                 st.markdown(f"""<div class="category-card"><h5>{title}</h5><p>{summary}</p></div>""", unsafe_allow_html=True)
     
     if report.get('action_items'):
-        st.markdown(f"<h4 style='color: {COLORS['cream']}; margin-top: 1.5rem;'>🎯 Action Items</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='margin-top: 1.5rem;'>🎯 Action Items</h4>", unsafe_allow_html=True)
         for item in report['action_items'][:4]:
             st.markdown(f"""<div class="action-item">{item}</div>""", unsafe_allow_html=True)
 
 def render_category_details(top_issues):
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown(f"<h3 style='color: {COLORS['maroon']} !important;'>📂 Reviews by Category</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>📂 Reviews by Category</h3>", unsafe_allow_html=True)
     
     icons = {'Login/Account Issues': '🔐', 'Performance/Bugs': '🐛', 'Updates/Installation': '📥',
              'Notifications/Messaging': '💬', 'Ads/Spam/Privacy': '🚫', 'Feature Requests': '✨'}
@@ -668,7 +678,7 @@ def main():
                 st.rerun()
         
         st.markdown("---")
-        st.caption("v5.0 • Dark Elegant")
+        st.caption("v6.0 • Luna Blue")
     
     # Main Content
     df = st.session_state.df
@@ -700,7 +710,7 @@ def main():
             
             st.markdown("---")
             st.markdown('<div class="section-card">', unsafe_allow_html=True)
-            st.markdown(f"<h3 style='color: {COLORS['maroon']} !important;'>📋 All Reviews ({sentiment_filter})</h3>", unsafe_allow_html=True)
+            st.markdown(f"<h3>📋 All Reviews ({sentiment_filter})</h3>", unsafe_allow_html=True)
             display_df = results['processed_df'].copy()
             if sentiment_filter != "All":
                 display_df = display_df[display_df['sentiment'] == sentiment_filter.lower()]

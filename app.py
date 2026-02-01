@@ -114,7 +114,8 @@ def simple_cluster(texts, n_clusters=6):
                 'label': labels[i] if i < len(labels) else f'Topic {i}',
                 'keywords': extract_keywords(clusters[i]),
                 'count': len(clusters[i]),
-                'sample_texts': clusters[i][:3]
+                'sample_texts': clusters[i][:10],  # Store more samples for display
+                'all_texts': clusters[i]  # Store all texts for category view
             }
     
     return cluster_info
@@ -148,7 +149,7 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
     if app_filter != "All" and 'app_id' in df.columns:
         df = df[df['app_id'] == app_filter].copy()
     
-    # Calculate totals BEFORE sentiment filter (for accurate percentages)
+    # Calculate totals
     total = len(df)
     if total == 0:
         return None
@@ -177,9 +178,9 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
         'health_score': round(100 - (negative_count / total * 100), 1)
     }
     
-    top_issues = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)[:5]
+    top_issues = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)[:6]
     
-    # Sample reviews based on filter
+    # Sample reviews
     sample_df = display_df if sentiment_filter != "All" else negative_df
     sample_complaints = []
     for _, row in sample_df.head(15).iterrows():
@@ -322,6 +323,53 @@ def render_issues_chart(top_issues):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def render_category_details(top_issues):
+    """Render expandable sections for each category with reviews."""
+    st.subheader("📂 Reviews by Category")
+    st.caption("Click on a category to view its reviews")
+    
+    if not top_issues:
+        st.info("No categories found.")
+        return
+    
+    # Category icons
+    icons = {
+        'Login/Account Issues': '🔐',
+        'Performance/Bugs': '🐛',
+        'Updates/Installation': '📥',
+        'Notifications/Messaging': '💬',
+        'Ads/Spam/Scams': '🚫',
+        'Feature Requests': '✨'
+    }
+    
+    for issue in top_issues:
+        label = issue.get('label', 'Unknown')
+        icon = icons.get(label, '📌')
+        count = issue.get('count', 0)
+        keywords = issue.get('keywords', [])
+        all_texts = issue.get('all_texts', issue.get('sample_texts', []))
+        
+        with st.expander(f"{icon} {label} ({count} reviews)", expanded=False):
+            # Keywords
+            if keywords:
+                st.markdown(f"**🏷️ Keywords:** {', '.join(keywords)}")
+            
+            st.markdown("---")
+            
+            # Show reviews in a table
+            if all_texts:
+                reviews_to_show = all_texts[:20]  # Show up to 20 reviews
+                reviews_df = pd.DataFrame({
+                    'Review': [str(text)[:300] + ('...' if len(str(text)) > 300 else '') for text in reviews_to_show]
+                })
+                st.dataframe(reviews_df, use_container_width=True, hide_index=True)
+                
+                if len(all_texts) > 20:
+                    st.caption(f"Showing 20 of {len(all_texts)} reviews in this category")
+            else:
+                st.info("No reviews available")
+
+
 # ============== MAIN APP ==============
 
 def main():
@@ -398,6 +446,11 @@ def main():
                 render_sentiment_chart(results['summary'])
             with col2:
                 render_issues_chart(results['top_issues'])
+            
+            st.divider()
+            
+            # Category Details - Expandable sections
+            render_category_details(results['top_issues'])
             
             st.divider()
             

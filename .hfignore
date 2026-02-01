@@ -1,0 +1,12 @@
+# Ignore backend and frontend folders for HF Spaces
+# These are only needed for local FastAPI development
+backend/
+frontend/
+
+# Git files
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc

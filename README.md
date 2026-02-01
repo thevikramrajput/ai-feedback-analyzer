@@ -197,10 +197,3 @@ After running the analysis, you'll see insights like:
 - [ ] Slack/Email notifications
 - [ ] Real-time data ingestion from Play Store API
 
-## 👨‍💻 Author
-
-Built for Machine Learning course - Semester 6
-
----
-
-*Made with ❤️ using Python, FastAPI, and Streamlit*

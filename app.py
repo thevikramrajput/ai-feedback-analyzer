@@ -1,6 +1,7 @@
 """
 AI Product Feedback Analyzer - Streamlit Dashboard
 Hugging Face Spaces Compatible Version with AI Summarization
+Version: 2.1 - Fixed T5 summarization
 """
 
 import streamlit as st

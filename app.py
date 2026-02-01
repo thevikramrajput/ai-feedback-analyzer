@@ -1,6 +1,6 @@
 """
 AI Product Feedback Analyzer - Streamlit Dashboard
-Version: 6.0 - Luna Blue UI
+Version: 7.0 - Sky Theme UI
 """
 
 import streamlit as st
@@ -10,13 +10,14 @@ import re
 import os
 from collections import Counter
 
-# ============== LUNA COLOR PALETTE ==============
+# ============== SKY THEME COLOR PALETTE ==============
 COLORS = {
-    'light_cyan': '#A7EBF2',    # Light accent, highlights
-    'teal': '#54ACBF',          # Primary buttons, accents
-    'blue': '#26658C',          # Secondary elements
-    'dark_blue': '#023859',     # Cards, content areas
-    'navy': '#011C40',          # Primary background
+    'skybound': '#60B1E0',      # Primary accent, buttons
+    'pearl': '#F2EFEE',         # Light background, cards
+    'quartz': '#CCCCCC',        # Borders, secondary elements
+    'twilight': '#C0D6E2',      # Section cards, sidebar
+    'honey': '#FFE0BC',         # Highlights, KPI cards
+    'tide': '#5B8CA6',          # Text, headings, dark accents
 }
 
 # Page configuration
@@ -27,27 +28,27 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ============== LUNA BLUE CSS ==============
+# ============== SKY THEME CSS ==============
 st.markdown(f"""
 <style>
     /* Import Google Font */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* Main Background */
+    /* Main Background - Frosted Pearl */
     .stApp {{
-        background-color: {COLORS['navy']};
+        background-color: {COLORS['pearl']};
         font-family: 'Inter', 'Segoe UI', sans-serif;
     }}
     
-    /* Sidebar */
+    /* Sidebar - Soft Twilight */
     [data-testid="stSidebar"] {{
-        background-color: {COLORS['dark_blue']} !important;
+        background-color: {COLORS['twilight']} !important;
     }}
     [data-testid="stSidebar"] * {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
     }}
     [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
         font-weight: 600;
     }}
     
@@ -56,168 +57,185 @@ st.markdown(f"""
     footer {{visibility: hidden;}}
     header {{visibility: hidden;}}
     
-    /* Hero Header */
+    /* Hero Header - Skybound Blue */
     .hero-card {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['skybound']};
         padding: 2.5rem 3rem;
         border-radius: 16px;
         text-align: center;
         margin-bottom: 2rem;
-        border: 1px solid {COLORS['blue']};
-        box-shadow: 0 8px 32px rgba(1, 28, 64, 0.5);
+        box-shadow: 0 8px 32px rgba(91, 140, 166, 0.2);
     }}
     .hero-card h1 {{
-        color: {COLORS['light_cyan']};
+        color: {COLORS['pearl']};
         font-size: 2.8rem;
         font-weight: 700;
         margin: 0;
         letter-spacing: -0.5px;
     }}
     .hero-card p {{
-        color: {COLORS['teal']};
+        color: {COLORS['twilight']};
         font-size: 1.15rem;
         margin: 0.8rem 0 0 0;
     }}
     
-    /* KPI Cards */
+    /* KPI Cards - Alternating Honey & Twilight */
     .kpi-card {{
-        background-color: {COLORS['dark_blue']};
         padding: 1.8rem 1.5rem;
         border-radius: 14px;
         text-align: center;
-        border: 1px solid {COLORS['blue']};
+        border: 1px solid {COLORS['quartz']};
         transition: all 0.3s ease;
-        box-shadow: 0 4px 20px rgba(1, 28, 64, 0.4);
+        box-shadow: 0 4px 16px rgba(91, 140, 166, 0.1);
     }}
     .kpi-card:hover {{
         transform: translateY(-4px);
-        border-color: {COLORS['teal']};
-        box-shadow: 0 8px 32px rgba(84, 172, 191, 0.2);
+        box-shadow: 0 8px 24px rgba(91, 140, 166, 0.2);
+    }}
+    .kpi-honey {{
+        background-color: {COLORS['honey']};
+    }}
+    .kpi-twilight {{
+        background-color: {COLORS['twilight']};
+    }}
+    .kpi-skybound {{
+        background-color: {COLORS['skybound']};
+    }}
+    .kpi-pearl {{
+        background-color: {COLORS['pearl']};
+        border: 2px solid {COLORS['quartz']};
     }}
     .kpi-value {{
         font-size: 2.8rem;
         font-weight: 700;
-        color: {COLORS['light_cyan']};
+        color: {COLORS['tide']};
         line-height: 1;
+    }}
+    .kpi-value-light {{
+        color: {COLORS['pearl']};
     }}
     .kpi-label {{
         font-size: 0.95rem;
-        color: {COLORS['teal']};
+        color: {COLORS['tide']};
         margin-top: 0.6rem;
         font-weight: 500;
+    }}
+    .kpi-label-light {{
+        color: {COLORS['twilight']};
     }}
     .kpi-icon {{
         font-size: 1.5rem;
         margin-bottom: 0.5rem;
     }}
     
-    /* Section Cards */
+    /* Section Cards - Twilight */
     .section-card {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['twilight']};
         padding: 1.8rem;
         border-radius: 14px;
-        border: 1px solid {COLORS['blue']};
+        border: 1px solid {COLORS['quartz']};
         margin: 1rem 0;
-        box-shadow: 0 4px 20px rgba(1, 28, 64, 0.4);
+        box-shadow: 0 4px 16px rgba(91, 140, 166, 0.1);
     }}
     .section-card h3 {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
         font-weight: 600;
         margin: 0 0 1rem 0;
     }}
     
-    /* Summary Card */
+    /* Summary Card - Pearl with Skybound border */
     .summary-card {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['pearl']};
         padding: 1.5rem;
         border-radius: 12px;
-        border-left: 4px solid {COLORS['teal']};
+        border-left: 4px solid {COLORS['skybound']};
         margin: 1rem 0;
-        border: 1px solid {COLORS['blue']};
+        border: 1px solid {COLORS['quartz']};
+        border-left: 4px solid {COLORS['skybound']};
     }}
     .summary-card h4 {{
-        color: {COLORS['light_cyan']};
+        color: {COLORS['tide']};
         margin: 0 0 0.5rem 0;
         font-weight: 600;
     }}
     .summary-card p {{
-        color: {COLORS['teal']};
+        color: {COLORS['tide']};
         margin: 0;
         line-height: 1.6;
     }}
     
-    /* Quote Card */
+    /* Quote Card - Honey */
     .quote-card {{
-        background-color: {COLORS['navy']};
+        background-color: {COLORS['honey']};
         padding: 1rem 1.2rem;
         border-radius: 10px;
-        border-left: 3px solid {COLORS['teal']};
+        border-left: 3px solid {COLORS['skybound']};
         margin: 0.6rem 0;
         font-style: italic;
-        color: {COLORS['light_cyan']};
+        color: {COLORS['tide']};
         font-size: 0.95rem;
     }}
     
-    /* Category Card */
+    /* Category Card - Pearl */
     .category-card {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['pearl']};
         padding: 1.2rem;
         border-radius: 12px;
-        border-left: 4px solid {COLORS['teal']};
+        border-left: 4px solid {COLORS['tide']};
         margin: 0.8rem 0;
-        border: 1px solid {COLORS['blue']};
+        border: 1px solid {COLORS['quartz']};
+        border-left: 4px solid {COLORS['tide']};
     }}
     .category-card h5 {{
-        color: {COLORS['light_cyan']};
+        color: {COLORS['tide']};
         margin: 0 0 0.5rem 0;
         font-weight: 600;
     }}
     .category-card p {{
-        color: {COLORS['teal']};
+        color: {COLORS['tide']};
         margin: 0;
         font-size: 0.95rem;
         line-height: 1.5;
     }}
     
-    /* Action Items */
+    /* Action Items - Skybound accent */
     .action-item {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['twilight']};
         padding: 1rem 1.2rem;
         border-radius: 10px;
-        border-left: 4px solid {COLORS['teal']};
+        border-left: 4px solid {COLORS['skybound']};
         margin: 0.5rem 0;
-        color: {COLORS['light_cyan']};
+        color: {COLORS['tide']};
         font-weight: 500;
-        border: 1px solid {COLORS['blue']};
     }}
     
-    /* Welcome Card */
+    /* Welcome Card - Honey */
     .welcome-card {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['honey']};
         padding: 4rem 3rem;
         border-radius: 16px;
         text-align: center;
         margin: 3rem auto;
         max-width: 600px;
-        border: 1px solid {COLORS['blue']};
-        box-shadow: 0 8px 32px rgba(1, 28, 64, 0.5);
+        border: 2px solid {COLORS['skybound']};
+        box-shadow: 0 8px 32px rgba(91, 140, 166, 0.15);
     }}
     .welcome-card h2 {{
-        color: {COLORS['light_cyan']};
+        color: {COLORS['tide']};
         font-size: 1.8rem;
         margin: 0;
         font-weight: 600;
     }}
     .welcome-card p {{
-        color: {COLORS['teal']};
+        color: {COLORS['tide']};
         margin: 1rem 0 0 0;
         font-size: 1.1rem;
     }}
     
-    /* Buttons */
+    /* Buttons - Skybound */
     .stButton > button {{
-        background-color: {COLORS['teal']} !important;
-        color: {COLORS['navy']} !important;
+        background-color: {COLORS['skybound']} !important;
+        color: {COLORS['pearl']} !important;
         border: none !important;
         border-radius: 12px !important;
         padding: 0.8rem 1.8rem !important;
@@ -226,60 +244,65 @@ st.markdown(f"""
         transition: all 0.3s ease !important;
     }}
     .stButton > button:hover {{
-        background-color: {COLORS['light_cyan']} !important;
+        background-color: {COLORS['tide']} !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(84, 172, 191, 0.4) !important;
+        box-shadow: 0 6px 20px rgba(96, 177, 224, 0.4) !important;
     }}
     
     /* Select boxes */
     .stSelectbox > div > div {{
-        background-color: {COLORS['navy']} !important;
-        border: 1px solid {COLORS['blue']} !important;
+        background-color: {COLORS['pearl']} !important;
+        border: 1px solid {COLORS['quartz']} !important;
         border-radius: 10px !important;
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
     }}
     .stSelectbox label {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
     }}
     
     /* Radio buttons */
     .stRadio label {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
     }}
     
     /* File uploader */
     [data-testid="stFileUploader"] {{
-        background-color: {COLORS['navy']};
+        background-color: {COLORS['pearl']};
         border-radius: 12px;
         padding: 1rem;
-        border: 2px dashed {COLORS['blue']};
+        border: 2px dashed {COLORS['skybound']};
     }}
     [data-testid="stFileUploader"] * {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
     }}
     
-    /* Expanders */
+    /* Expanders - Honey */
     .streamlit-expanderHeader {{
-        background-color: {COLORS['dark_blue']} !important;
+        background-color: {COLORS['honey']} !important;
         border-radius: 10px !important;
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
         font-weight: 500;
-        border: 1px solid {COLORS['blue']} !important;
     }}
     
     /* Dataframes */
     [data-testid="stDataFrame"] {{
-        background-color: {COLORS['dark_blue']};
+        background-color: {COLORS['pearl']};
         border-radius: 12px !important;
         overflow: hidden;
-        border: 1px solid {COLORS['blue']};
+        border: 1px solid {COLORS['quartz']};
     }}
     
     /* Success/Info boxes */
-    .stSuccess, .stInfo {{
-        background-color: {COLORS['dark_blue']} !important;
-        color: {COLORS['light_cyan']} !important;
-        border: 1px solid {COLORS['teal']} !important;
+    .stSuccess {{
+        background-color: {COLORS['twilight']} !important;
+        color: {COLORS['tide']} !important;
+        border: 1px solid {COLORS['skybound']} !important;
+        border-radius: 10px !important;
+    }}
+    .stInfo {{
+        background-color: {COLORS['honey']} !important;
+        color: {COLORS['tide']} !important;
+        border: 1px solid {COLORS['quartz']} !important;
         border-radius: 10px !important;
     }}
     
@@ -287,28 +310,28 @@ st.markdown(f"""
     hr {{
         border: none;
         height: 1px;
-        background-color: {COLORS['blue']};
+        background-color: {COLORS['quartz']};
         margin: 2rem 0;
     }}
     
     /* All headings */
     h1, h2, h3, h4, h5, h6 {{
-        color: {COLORS['light_cyan']} !important;
+        color: {COLORS['tide']} !important;
     }}
     
     /* Main text */
     .stApp p, .stApp span, .stApp label {{
-        color: {COLORS['teal']};
+        color: {COLORS['tide']};
     }}
     
     /* Caption */
     .stCaption {{
-        color: {COLORS['blue']} !important;
+        color: {COLORS['quartz']} !important;
     }}
     
     /* Spinner */
     .stSpinner > div {{
-        border-top-color: {COLORS['teal']} !important;
+        border-top-color: {COLORS['skybound']} !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -318,7 +341,6 @@ st.markdown(f"""
 
 @st.cache_resource
 def load_summarizer():
-    """Load the T5 summarization model (cached)."""
     try:
         from transformers import T5Tokenizer, T5ForConditionalGeneration
         model_name = "t5-small"
@@ -331,7 +353,6 @@ def load_summarizer():
 
 
 def summarize_text(text, summarizer, max_len=150):
-    """Generate summary for given text using T5."""
     if not summarizer or not text or len(text.strip()) < 50:
         return None
     try:
@@ -346,7 +367,6 @@ def summarize_text(text, summarizer, max_len=150):
 
 
 def generate_detailed_ai_summary(df, cluster_info, summarizer):
-    """Generate comprehensive AI summary."""
     report = {
         'overall_summary': '', 'negative_summary': '', 'positive_summary': '',
         'login_summary': '', 'bugs_summary': '', 'features_summary': '', 'messaging_summary': '',
@@ -506,9 +526,10 @@ def render_hero():
 def render_kpi_cards(summary):
     col1, col2, col3, col4 = st.columns(4)
     
+    # Each KPI uses a different color from the palette
     with col1:
         st.markdown(f"""
-        <div class="kpi-card">
+        <div class="kpi-card kpi-honey">
             <div class="kpi-icon">📝</div>
             <div class="kpi-value">{summary.get('total_reviews', 0):,}</div>
             <div class="kpi-label">Total Reviews</div>
@@ -517,7 +538,7 @@ def render_kpi_cards(summary):
     
     with col2:
         st.markdown(f"""
-        <div class="kpi-card">
+        <div class="kpi-card kpi-twilight">
             <div class="kpi-icon">😊</div>
             <div class="kpi-value">{summary.get('positive_percentage', 0)}%</div>
             <div class="kpi-label">Positive</div>
@@ -526,16 +547,16 @@ def render_kpi_cards(summary):
     
     with col3:
         st.markdown(f"""
-        <div class="kpi-card">
+        <div class="kpi-card kpi-skybound">
             <div class="kpi-icon">😟</div>
-            <div class="kpi-value">{summary.get('negative_percentage', 0)}%</div>
-            <div class="kpi-label">Negative</div>
+            <div class="kpi-value kpi-value-light">{summary.get('negative_percentage', 0)}%</div>
+            <div class="kpi-label kpi-label-light">Negative</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown(f"""
-        <div class="kpi-card">
+        <div class="kpi-card kpi-pearl">
             <div class="kpi-icon">💪</div>
             <div class="kpi-value">{summary.get('health_score', 0)}%</div>
             <div class="kpi-label">Health Score</div>
@@ -546,15 +567,16 @@ def render_sentiment_chart(summary):
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown("<h3>📊 Sentiment Distribution</h3>", unsafe_allow_html=True)
     
+    # Uses all 6 colors in the chart
     fig = go.Figure(data=[go.Pie(
         labels=['Positive', 'Neutral', 'Negative'],
         values=[summary.get('positive_count', 0), summary.get('neutral_count', 0), summary.get('negative_count', 0)],
         hole=0.45,
-        marker_colors=[COLORS['teal'], COLORS['blue'], COLORS['light_cyan']],
+        marker_colors=[COLORS['tide'], COLORS['quartz'], COLORS['skybound']],
         textinfo='label+percent',
-        textfont=dict(color=COLORS['navy'], size=13, family='Inter')
+        textfont=dict(color=COLORS['tide'], size=13, family='Inter')
     )])
-    fig.update_layout(showlegend=True, legend=dict(font=dict(color=COLORS['light_cyan'], size=12)),
+    fig.update_layout(showlegend=True, legend=dict(font=dict(color=COLORS['tide'], size=12)),
                      margin=dict(t=10, b=10, l=10, r=10), height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -570,14 +592,15 @@ def render_issues_chart(top_issues):
     
     labels = [issue.get('label', 'Unknown')[:20] for issue in top_issues]
     counts = [issue.get('count', 0) for issue in top_issues]
-    colors = [COLORS['light_cyan'], COLORS['teal'], COLORS['blue'], COLORS['dark_blue'], COLORS['teal'], COLORS['light_cyan']]
+    # All 6 colors used for bars
+    colors = [COLORS['skybound'], COLORS['honey'], COLORS['tide'], COLORS['twilight'], COLORS['quartz'], COLORS['skybound']]
     
     fig = go.Figure(data=[go.Bar(
         x=counts, y=labels, orientation='h', marker=dict(color=colors[:len(labels)], line=dict(width=0)),
-        text=counts, textposition='outside', textfont=dict(color=COLORS['light_cyan'], size=12, family='Inter')
+        text=counts, textposition='outside', textfont=dict(color=COLORS['tide'], size=12, family='Inter')
     )])
-    fig.update_layout(xaxis=dict(tickfont=dict(color=COLORS['teal']), showgrid=False),
-                     yaxis=dict(autorange="reversed", tickfont=dict(color=COLORS['light_cyan'], size=11)),
+    fig.update_layout(xaxis=dict(tickfont=dict(color=COLORS['tide']), showgrid=False),
+                     yaxis=dict(autorange="reversed", tickfont=dict(color=COLORS['tide'], size=11)),
                      margin=dict(t=10, b=30, l=130, r=50), height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -678,7 +701,7 @@ def main():
                 st.rerun()
         
         st.markdown("---")
-        st.caption("v6.0 • Luna Blue")
+        st.caption("v7.0 • Sky Theme")
     
     # Main Content
     df = st.session_state.df

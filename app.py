@@ -1,7 +1,7 @@
 """
 AI Product Feedback Analyzer - Streamlit Dashboard
 Hugging Face Spaces Compatible Version with AI Summarization
-Version: 2.1 - Fixed T5 summarization
+Version: 3.0 - Pastel UI Redesign
 """
 
 import streamlit as st
@@ -11,6 +11,19 @@ import re
 import os
 from collections import Counter
 
+# ============== COLOR PALETTE ==============
+COLORS = {
+    'soft_blue': '#99CDD8',
+    'mint': '#DAEBE3',
+    'cream': '#FDE8D3',
+    'peach': '#F3C3B2',
+    'sage': '#CFDBC4',
+    'text': '#657166',
+    'text_light': '#7d8a7e',
+    'white': '#FFFFFF',
+    'shadow': 'rgba(101, 113, 102, 0.1)'
+}
+
 # Page configuration
 st.set_page_config(
     page_title="AI Product Feedback Analyzer",
@@ -19,22 +32,223 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
-st.markdown("""
+# Custom CSS with Pastel Color Palette
+st.markdown(f"""
 <style>
-    .main-header {
-        background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+    /* Main Background */
+    .stApp {{
+        background: linear-gradient(135deg, {COLORS['mint']} 0%, {COLORS['soft_blue']} 100%);
+    }}
+    
+    /* Sidebar */
+    [data-testid="stSidebar"] {{
+        background: {COLORS['sage']} !important;
+    }}
+    [data-testid="stSidebar"] * {{
+        color: {COLORS['text']} !important;
+    }}
+    [data-testid="stSidebar"] .stRadio label {{
+        color: {COLORS['text']} !important;
+    }}
+    
+    /* Main Header */
+    .main-header {{
+        background: linear-gradient(135deg, {COLORS['cream']} 0%, {COLORS['peach']} 100%);
         padding: 2rem;
-        border-radius: 15px;
+        border-radius: 20px;
         margin-bottom: 2rem;
-        color: white;
         text-align: center;
-    }
-    .main-header h1 { margin: 0; font-size: 2.5rem; color: white !important; }
-    .main-header p { margin: 0.5rem 0 0 0; opacity: 0.9; color: #e2e8f0 !important; }
-    h2, h3 { color: #f8fafc !important; }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
+        box-shadow: 0 8px 32px {COLORS['shadow']};
+        border: 1px solid rgba(255,255,255,0.3);
+    }}
+    .main-header h1 {{
+        margin: 0;
+        font-size: 2.5rem;
+        color: {COLORS['text']} !important;
+        font-weight: 700;
+    }}
+    .main-header p {{
+        margin: 0.5rem 0 0 0;
+        color: {COLORS['text_light']} !important;
+        font-size: 1.1rem;
+    }}
+    
+    /* Headings */
+    h1, h2, h3, h4, h5, h6 {{
+        color: {COLORS['text']} !important;
+    }}
+    
+    /* Text */
+    p, span, div, label {{
+        color: {COLORS['text']};
+    }}
+    
+    /* Buttons */
+    .stButton > button {{
+        background: linear-gradient(135deg, {COLORS['peach']} 0%, {COLORS['cream']} 100%) !important;
+        color: {COLORS['text']} !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 0.75rem 2rem !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 15px {COLORS['shadow']} !important;
+        transition: all 0.3s ease !important;
+    }}
+    .stButton > button:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px {COLORS['shadow']} !important;
+    }}
+    .stButton > button[kind="primary"] {{
+        background: linear-gradient(135deg, {COLORS['soft_blue']} 0%, {COLORS['sage']} 100%) !important;
+    }}
+    
+    /* Select boxes */
+    .stSelectbox > div > div {{
+        background: {COLORS['white']} !important;
+        border: 2px solid {COLORS['sage']} !important;
+        border-radius: 10px !important;
+        color: {COLORS['text']} !important;
+    }}
+    
+    /* File uploader */
+    .stFileUploader {{
+        background: {COLORS['white']} !important;
+        border-radius: 12px !important;
+        border: 2px dashed {COLORS['sage']} !important;
+    }}
+    
+    /* Expanders */
+    .streamlit-expanderHeader {{
+        background: {COLORS['cream']} !important;
+        border-radius: 10px !important;
+        color: {COLORS['text']} !important;
+    }}
+    
+    /* Dataframes */
+    .stDataFrame {{
+        border-radius: 12px !important;
+        overflow: hidden !important;
+    }}
+    [data-testid="stDataFrame"] {{
+        background: {COLORS['white']} !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 15px {COLORS['shadow']} !important;
+    }}
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {{
+        color: {COLORS['text']} !important;
+    }}
+    
+    /* Success/Info messages */
+    .stSuccess {{
+        background: {COLORS['sage']} !important;
+        color: {COLORS['text']} !important;
+    }}
+    .stInfo {{
+        background: {COLORS['soft_blue']} !important;
+        color: {COLORS['text']} !important;
+    }}
+    
+    /* Spinner */
+    .stSpinner > div {{
+        border-color: {COLORS['peach']} !important;
+    }}
+    
+    /* Hide default elements */
+    #MainMenu {{visibility: hidden;}}
+    footer {{visibility: hidden;}}
+    
+    /* Cards */
+    .kpi-card {{
+        padding: 1.5rem;
+        border-radius: 16px;
+        text-align: center;
+        box-shadow: 0 4px 20px {COLORS['shadow']};
+        border: 1px solid rgba(255,255,255,0.5);
+        transition: transform 0.3s ease;
+    }}
+    .kpi-card:hover {{
+        transform: translateY(-4px);
+    }}
+    .kpi-value {{
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: {COLORS['text']};
+    }}
+    .kpi-label {{
+        font-size: 0.95rem;
+        color: {COLORS['text_light']};
+        margin-top: 0.5rem;
+    }}
+    
+    /* Summary cards */
+    .summary-card {{
+        background: {COLORS['white']};
+        padding: 1.5rem;
+        border-radius: 16px;
+        border-left: 5px solid {COLORS['soft_blue']};
+        box-shadow: 0 4px 15px {COLORS['shadow']};
+        margin: 1rem 0;
+    }}
+    .summary-card h4 {{
+        color: {COLORS['text']} !important;
+        margin: 0 0 0.5rem 0;
+    }}
+    .summary-card p {{
+        color: {COLORS['text_light']};
+        margin: 0;
+        line-height: 1.6;
+    }}
+    
+    /* Category cards */
+    .category-card {{
+        background: {COLORS['cream']};
+        padding: 1rem;
+        border-radius: 12px;
+        border-left: 4px solid {COLORS['peach']};
+        margin: 0.5rem 0;
+    }}
+    
+    /* Quote cards */
+    .quote-card {{
+        background: {COLORS['white']};
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 3px solid {COLORS['sage']};
+        margin: 0.5rem 0;
+        font-style: italic;
+        color: {COLORS['text_light']};
+    }}
+    
+    /* Action items */
+    .action-item {{
+        background: {COLORS['white']};
+        padding: 0.8rem 1rem;
+        border-radius: 10px;
+        border-left: 4px solid {COLORS['soft_blue']};
+        margin: 0.5rem 0;
+        color: {COLORS['text']};
+    }}
+    
+    /* Welcome card */
+    .welcome-card {{
+        background: linear-gradient(135deg, {COLORS['cream']} 0%, {COLORS['peach']} 100%);
+        padding: 3rem;
+        border-radius: 20px;
+        text-align: center;
+        margin: 2rem 0;
+        box-shadow: 0 8px 32px {COLORS['shadow']};
+    }}
+    .welcome-card h2 {{
+        color: {COLORS['text']} !important;
+        margin: 0;
+    }}
+    .welcome-card p {{
+        color: {COLORS['text_light']};
+        margin: 1rem 0 0 0;
+        font-size: 1.1rem;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -66,11 +280,9 @@ def summarize_text(text, summarizer, max_len=150):
         tokenizer = summarizer['tokenizer']
         model = summarizer['model']
         
-        # Prepare input for T5
         input_text = f"summarize: {text[:1500]}"
         inputs = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True)
         
-        # Generate summary
         outputs = model.generate(
             inputs,
             max_length=max_len,
@@ -102,7 +314,7 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
         'action_items': []
     }
     
-    # 1. OVERALL SUMMARY - Combine sample reviews
+    # 1. OVERALL SUMMARY
     all_reviews = df['content'].astype(str).tolist()[:50]
     combined_all = " | ".join([r[:150] for r in all_reviews if len(r) > 20])
     
@@ -112,7 +324,7 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
             summarizer, max_len=200
         ) or "Could not generate overall summary."
     
-    # 2. NEGATIVE REVIEWS SUMMARY - What users are complaining about
+    # 2. NEGATIVE REVIEWS SUMMARY
     negative_df = df[df['sentiment'] == 'negative'] if 'sentiment' in df.columns else pd.DataFrame()
     if len(negative_df) > 0:
         neg_reviews = negative_df['content'].astype(str).tolist()[:40]
@@ -124,12 +336,11 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
                 summarizer, max_len=200
             ) or "Could not generate negative summary."
         
-        # Extract actual complaints as quotes
         for review in neg_reviews[:5]:
             if len(review) > 30:
                 report['top_complaints'].append(review[:200])
     
-    # 3. POSITIVE REVIEWS SUMMARY - What users love
+    # 3. POSITIVE REVIEWS SUMMARY
     positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
     if len(positive_df) > 0:
         pos_reviews = positive_df['content'].astype(str).tolist()[:30]
@@ -141,7 +352,6 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
                 summarizer, max_len=150
             ) or "Could not generate positive summary."
         
-        # Extract actual praises
         for review in pos_reviews[:3]:
             if len(review) > 30:
                 report['top_praises'].append(review[:200])
@@ -159,7 +369,6 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
         if label in category_labels:
             texts = info.get('all_texts', info.get('sample_texts', []))
             if texts:
-                # Get ORIGINAL reviews (not cleaned) for better summary
                 combined = " | ".join([str(t)[:150] for t in texts[:25] if len(str(t)) > 20])
                 
                 if summarizer and combined:
@@ -175,9 +384,9 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
                         summarizer, max_len=150
                     ) or f"Found {len(texts)} reviews about {label}"
     
-    # 5. ACTION ITEMS based on actual review content
+    # 5. ACTION ITEMS
     if report['negative_summary']:
-        report['action_items'].append(f"🔴 Address user complaints: {report['negative_summary'][:200]}")
+        report['action_items'].append(f"🔴 Address complaints: {report['negative_summary'][:200]}")
     
     for label, key in category_labels.items():
         if report.get(key):
@@ -231,7 +440,7 @@ def extract_keywords(texts, top_n=5):
 
 
 def simple_cluster(texts, original_reviews, n_clusters=6):
-    """Simple keyword-based clustering. Returns both cleaned and original texts."""
+    """Simple keyword-based clustering."""
     clusters = {i: {'cleaned': [], 'original': []} for i in range(n_clusters)}
     
     issue_keywords = [
@@ -269,7 +478,7 @@ def simple_cluster(texts, original_reviews, n_clusters=6):
                 'count': len(clusters[i]['cleaned']),
                 'sample_texts': clusters[i]['cleaned'][:10],
                 'all_texts': clusters[i]['cleaned'],
-                'original_texts': clusters[i]['original']  # Keep original for summary
+                'original_texts': clusters[i]['original']
             }
     
     return cluster_info
@@ -313,7 +522,6 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
     
     negative_df = df[df['sentiment'] == 'negative']
     
-    # Pass both cleaned and original texts
     cluster_info = simple_cluster(
         negative_df['cleaned_content'].tolist(),
         negative_df['content'].tolist()
@@ -382,58 +590,53 @@ def render_kpi_cards(summary):
     
     with col1:
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
-            <div style="font-size: 2.5rem; font-weight: 700;">{summary.get('total_reviews', 0):,}</div>
-            <div style="font-size: 0.9rem; opacity: 0.9;">📝 Total Reviews</div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['soft_blue']} 0%, {COLORS['mint']} 100%);">
+            <div class="kpi-value">{summary.get('total_reviews', 0):,}</div>
+            <div class="kpi-label">📝 Total Reviews</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
-            <div style="font-size: 2.5rem; font-weight: 700;">{summary.get('positive_percentage', 0)}%</div>
-            <div style="font-size: 0.9rem; opacity: 0.9;">😊 Positive</div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['sage']} 0%, {COLORS['mint']} 100%);">
+            <div class="kpi-value">{summary.get('positive_percentage', 0)}%</div>
+            <div class="kpi-label">😊 Positive</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
-            <div style="font-size: 2.5rem; font-weight: 700;">{summary.get('negative_percentage', 0)}%</div>
-            <div style="font-size: 0.9rem; opacity: 0.9;">😟 Negative</div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['peach']} 0%, {COLORS['cream']} 100%);">
+            <div class="kpi-value">{summary.get('negative_percentage', 0)}%</div>
+            <div class="kpi-label">😟 Negative</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         health = summary.get('health_score', 0)
-        color = "#11998e" if health >= 70 else "#f5576c" if health < 50 else "#ffa726"
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, {color} 0%, #ffffff22 100%); 
-                    padding: 1.5rem; border-radius: 12px; text-align: center; color: white;">
-            <div style="font-size: 2.5rem; font-weight: 700;">{health}%</div>
-            <div style="font-size: 0.9rem; opacity: 0.9;">💪 Health Score</div>
+        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['cream']} 0%, {COLORS['sage']} 100%);">
+            <div class="kpi-value">{health}%</div>
+            <div class="kpi-label">💪 Health Score</div>
         </div>
         """, unsafe_allow_html=True)
 
 
 def render_sentiment_chart(summary):
-    st.subheader("📊 Sentiment Distribution")
+    st.markdown(f"<h3 style='color: {COLORS['text']};'>📊 Sentiment Distribution</h3>", unsafe_allow_html=True)
     
     fig = go.Figure(data=[go.Pie(
         labels=['Positive', 'Neutral', 'Negative'],
         values=[summary.get('positive_count', 0), summary.get('neutral_count', 0), summary.get('negative_count', 0)],
         hole=0.4,
-        marker_colors=['#38ef7d', '#ffa726', '#f5576c'],
+        marker_colors=[COLORS['sage'], COLORS['soft_blue'], COLORS['peach']],
         textinfo='label+percent',
-        textfont=dict(color='white', size=14)
+        textfont=dict(color=COLORS['text'], size=14)
     )])
     
     fig.update_layout(
         showlegend=True,
-        legend=dict(font=dict(color='white')),
+        legend=dict(font=dict(color=COLORS['text'])),
         margin=dict(t=20, b=60, l=20, r=20),
         height=400,
         paper_bgcolor='rgba(0,0,0,0)',
@@ -443,7 +646,7 @@ def render_sentiment_chart(summary):
 
 
 def render_issues_chart(top_issues):
-    st.subheader("🎯 Top Complaint Categories")
+    st.markdown(f"<h3 style='color: {COLORS['text']};'>🎯 Top Complaint Categories</h3>", unsafe_allow_html=True)
     
     if not top_issues:
         st.info("No issues found.")
@@ -452,16 +655,19 @@ def render_issues_chart(top_issues):
     labels = [issue.get('label', 'Unknown')[:25] for issue in top_issues]
     counts = [issue.get('count', 0) for issue in top_issues]
     
+    # Alternate colors from palette
+    bar_colors = [COLORS['peach'], COLORS['soft_blue'], COLORS['sage'], COLORS['cream'], COLORS['mint'], COLORS['peach']]
+    
     fig = go.Figure(data=[go.Bar(
         x=counts, y=labels, orientation='h',
-        marker=dict(color=counts, colorscale=[[0, '#ffa726'], [1, '#f5576c']]),
+        marker=dict(color=bar_colors[:len(labels)]),
         text=counts, textposition='outside',
-        textfont=dict(color='white')
+        textfont=dict(color=COLORS['text'])
     )])
     
     fig.update_layout(
-        xaxis=dict(title_font=dict(color='white'), tickfont=dict(color='white')),
-        yaxis=dict(autorange="reversed", tickfont=dict(color='white')),
+        xaxis=dict(title_font=dict(color=COLORS['text']), tickfont=dict(color=COLORS['text'])),
+        yaxis=dict(autorange="reversed", tickfont=dict(color=COLORS['text'])),
         margin=dict(t=20, b=40, l=160, r=40),
         height=400,
         paper_bgcolor='rgba(0,0,0,0)',
@@ -471,20 +677,17 @@ def render_issues_chart(top_issues):
 
 
 def render_ai_summary(report):
-    """Render the detailed AI summary showing what users actually said."""
+    """Render the detailed AI summary with pastel styling."""
     st.markdown("---")
-    st.header("🤖 AI-Generated Review Summary")
+    st.markdown(f"<h2 style='color: {COLORS['text']};'>🤖 AI-Generated Review Summary</h2>", unsafe_allow_html=True)
     st.caption("Based on analysis of actual user reviews")
     
     # Overall Summary
     if report.get('overall_summary'):
         st.markdown(f"""
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-                    padding: 1.5rem; border-radius: 12px; border-left: 5px solid #3b82f6; margin: 1rem 0;">
-            <h4 style="color: #3b82f6; margin: 0;">📋 Overall Summary</h4>
-            <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 1.1rem; line-height: 1.6;">
-                {report['overall_summary']}
-            </p>
+        <div class="summary-card">
+            <h4>📋 Overall Summary</h4>
+            <p>{report['overall_summary']}</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -492,59 +695,43 @@ def render_ai_summary(report):
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("### 😟 What Users Are Complaining About")
+        st.markdown(f"<h4 style='color: {COLORS['text']};'>😟 What Users Are Complaining About</h4>", unsafe_allow_html=True)
         if report.get('negative_summary'):
             st.markdown(f"""
-            <div style="background: #1e293b; padding: 1rem; border-radius: 10px; border-left: 4px solid #ef4444;">
-                <p style="color: #fca5a5; margin: 0; font-size: 1rem; line-height: 1.5;">
-                    {report['negative_summary']}
-                </p>
+            <div class="category-card" style="border-left-color: {COLORS['peach']};">
+                <p style="color: {COLORS['text']}; margin: 0;">{report['negative_summary']}</p>
             </div>
             """, unsafe_allow_html=True)
         
-        # Show actual complaint quotes
         if report.get('top_complaints'):
-            st.markdown("**💬 Sample User Complaints:**")
-            for i, complaint in enumerate(report['top_complaints'][:3], 1):
-                st.markdown(f"""
-                <div style="background: #292524; padding: 0.8rem; border-radius: 8px; margin: 0.3rem 0;
-                            border-left: 3px solid #f87171; font-style: italic;">
-                    <span style="color: #d6d3d1;">"{complaint}"</span>
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"<p style='color: {COLORS['text']}; font-weight: 600;'>💬 Sample Complaints:</p>", unsafe_allow_html=True)
+            for complaint in report['top_complaints'][:3]:
+                st.markdown(f"""<div class="quote-card">"{complaint}"</div>""", unsafe_allow_html=True)
     
     with col2:
-        st.markdown("### 😊 What Users Love About the App")
+        st.markdown(f"<h4 style='color: {COLORS['text']};'>😊 What Users Love About the App</h4>", unsafe_allow_html=True)
         if report.get('positive_summary'):
             st.markdown(f"""
-            <div style="background: #1e293b; padding: 1rem; border-radius: 10px; border-left: 4px solid #22c55e;">
-                <p style="color: #86efac; margin: 0; font-size: 1rem; line-height: 1.5;">
-                    {report['positive_summary']}
-                </p>
+            <div class="category-card" style="border-left-color: {COLORS['sage']};">
+                <p style="color: {COLORS['text']}; margin: 0;">{report['positive_summary']}</p>
             </div>
             """, unsafe_allow_html=True)
         
-        # Show actual praise quotes
         if report.get('top_praises'):
-            st.markdown("**💬 Sample User Praises:**")
-            for i, praise in enumerate(report['top_praises'][:3], 1):
-                st.markdown(f"""
-                <div style="background: #1a2e1a; padding: 0.8rem; border-radius: 8px; margin: 0.3rem 0;
-                            border-left: 3px solid #4ade80; font-style: italic;">
-                    <span style="color: #d6d3d1;">"{praise}"</span>
-                </div>
-                """, unsafe_allow_html=True)
+            st.markdown(f"<p style='color: {COLORS['text']}; font-weight: 600;'>💬 Sample Praises:</p>", unsafe_allow_html=True)
+            for praise in report['top_praises'][:3]:
+                st.markdown(f"""<div class="quote-card" style="border-left-color: {COLORS['sage']};">"{praise}"</div>""", unsafe_allow_html=True)
     
     st.markdown("---")
     
     # Category-wise summaries
-    st.markdown("### 📂 Category-Wise Summary (What Users Said)")
+    st.markdown(f"<h4 style='color: {COLORS['text']};'>📂 Category-Wise Summary</h4>", unsafe_allow_html=True)
     
     categories = [
-        ('🔐 Login/Account Issues', report.get('login_summary'), '#ef4444'),
-        ('🐛 Bugs & Performance', report.get('bugs_summary'), '#f97316'),
-        ('✨ Feature Requests', report.get('features_summary'), '#a855f7'),
-        ('💬 Messaging Issues', report.get('messaging_summary'), '#06b6d4'),
+        ('🔐 Login/Account', report.get('login_summary'), COLORS['peach']),
+        ('🐛 Bugs & Performance', report.get('bugs_summary'), COLORS['soft_blue']),
+        ('✨ Feature Requests', report.get('features_summary'), COLORS['sage']),
+        ('💬 Messaging Issues', report.get('messaging_summary'), COLORS['cream']),
     ]
     
     cols = st.columns(2)
@@ -552,31 +739,23 @@ def render_ai_summary(report):
         if summary:
             with cols[i % 2]:
                 st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 10px; 
-                            border-left: 4px solid {color}; margin: 0.5rem 0; min-height: 120px;">
-                    <h5 style="color: {color}; margin: 0 0 0.5rem 0;">{title}</h5>
-                    <p style="color: #cbd5e1; margin: 0; font-size: 0.95rem; line-height: 1.5;">
-                        {summary}
-                    </p>
+                <div class="category-card" style="border-left-color: {color}; background: {COLORS['white']};">
+                    <h5 style="color: {COLORS['text']}; margin: 0 0 0.5rem 0;">{title}</h5>
+                    <p style="color: {COLORS['text_light']}; margin: 0; font-size: 0.95rem;">{summary}</p>
                 </div>
                 """, unsafe_allow_html=True)
     
     # Action Items
     if report.get('action_items'):
         st.markdown("---")
-        st.markdown("### 🎯 Key Action Items (Based on User Feedback)")
+        st.markdown(f"<h4 style='color: {COLORS['text']};'>🎯 Key Action Items</h4>", unsafe_allow_html=True)
         for item in report['action_items'][:5]:
-            st.markdown(f"""
-            <div style="background: #1e293b; padding: 0.8rem 1rem; border-radius: 8px; margin: 0.3rem 0;
-                        border-left: 4px solid #3b82f6;">
-                <span style="color: #e2e8f0;">{item}</span>
-            </div>
-            """, unsafe_allow_html=True)
+            st.markdown(f"""<div class="action-item">{item}</div>""", unsafe_allow_html=True)
 
 
 def render_category_details(top_issues):
     """Render expandable sections for each category with ALL reviews."""
-    st.subheader("📂 Reviews by Category")
+    st.markdown(f"<h3 style='color: {COLORS['text']};'>📂 Reviews by Category</h3>", unsafe_allow_html=True)
     
     if not top_issues:
         st.info("No categories found.")
@@ -605,7 +784,6 @@ def render_category_details(top_issues):
             st.markdown("---")
             
             if all_texts:
-                # Show ALL reviews with pagination
                 reviews_df = pd.DataFrame({
                     '#': range(1, len(all_texts) + 1),
                     'Review': [str(text)[:500] for text in all_texts]
@@ -628,7 +806,7 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.title("📁 Data Source")
+        st.markdown(f"<h2 style='color: {COLORS['text']};'>📁 Data Source</h2>", unsafe_allow_html=True)
         
         data_source = st.radio(
             "Choose data source:",
@@ -651,7 +829,7 @@ def main():
         
         st.divider()
         
-        st.subheader("🔍 Filters")
+        st.markdown(f"<h3 style='color: {COLORS['text']};'>🔍 Filters</h3>", unsafe_allow_html=True)
         sentiment_filter = st.selectbox("Sentiment", ["All", "Positive", "Neutral", "Negative"])
         
         app_filter = "All"
@@ -668,7 +846,7 @@ def main():
                 st.rerun()
         
         st.divider()
-        st.caption("v2.1 - Powered by T5")
+        st.caption("v3.0 - Pastel UI")
     
     # Main content
     df = st.session_state.df
@@ -692,7 +870,7 @@ def main():
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 if st.button("🤖 Generate Detailed AI Summary", type="primary", use_container_width=True):
-                    with st.spinner("🧠 Reading all reviews and generating summary... Please wait..."):
+                    with st.spinner("🧠 Reading all reviews and generating summary..."):
                         summarizer = load_summarizer()
                         report = generate_detailed_ai_summary(
                             results['processed_df'],
@@ -711,7 +889,7 @@ def main():
             st.divider()
             
             # All Reviews section
-            st.subheader(f"📋 All Reviews ({sentiment_filter})")
+            st.markdown(f"<h3 style='color: {COLORS['text']};'>📋 All Reviews ({sentiment_filter})</h3>", unsafe_allow_html=True)
             if 'processed_df' in results and len(results['processed_df']) > 0:
                 display_df = results['processed_df'].copy()
                 if sentiment_filter != "All":
@@ -731,12 +909,9 @@ def main():
     elif df is not None and not st.session_state.analyzed:
         # Show welcome message before analysis
         st.markdown("""
-        <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-                    padding: 3rem; border-radius: 16px; text-align: center; margin: 2rem 0;">
-            <h2 style="color: #3b82f6; margin: 0;">👈 Click "Start Analysis" to Begin</h2>
-            <p style="color: #94a3b8; margin: 1rem 0 0 0; font-size: 1.1rem;">
-                Select your data source and filters, then click the button in the sidebar to analyze your reviews.
-            </p>
+        <div class="welcome-card">
+            <h2>👈 Click "Start Analysis" to Begin</h2>
+            <p>Select your data source and filters, then click the button in the sidebar to analyze your reviews.</p>
         </div>
         """, unsafe_allow_html=True)
     else:
@@ -745,4 +920,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

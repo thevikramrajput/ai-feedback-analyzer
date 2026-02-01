@@ -1,3 +1,14 @@
+---
+title: AI Feedback Analyzer
+emoji: 📊
+colorFrom: purple
+colorTo: blue
+sdk: streamlit
+sdk_version: "1.28.2"
+app_file: app.py
+pinned: false
+---
+
 # AI Product Feedback Analyzer
 
 A production-style AI system that converts raw user reviews into actionable product insights for product managers and growth teams.
@@ -70,8 +81,9 @@ An end-to-end AI pipeline that:
 ## 📁 Project Structure
 
 ```
-Product Review analyzer/
+ai-feedback-analyzer/
 │
+├── app.py               # Main Streamlit app (HF Spaces)
 ├── backend/
 │   ├── app.py           # FastAPI main application
 │   ├── data_loader.py   # CSV loading and validation
@@ -81,7 +93,7 @@ Product Review analyzer/
 │   └── insights.py      # Product metrics and summaries
 │
 ├── frontend/
-│   └── app.py           # Streamlit dashboard
+│   └── app.py           # Streamlit dashboard (local)
 │
 ├── data/
 │   └── Training_Data.csv # Google Play Store reviews
@@ -97,7 +109,6 @@ Product Review analyzer/
 - **Streamlit** - Dashboard UI
 - **Pandas** - Data processing
 - **scikit-learn** - KMeans clustering
-- **sentence-transformers** - Text embeddings (optional)
 - **Plotly** - Interactive charts
 
 ## ⚡ Quick Start
@@ -115,28 +126,13 @@ cd backend
 uvicorn app:app --reload --port 8000
 ```
 
-The API will be available at: http://localhost:8000
-
-API Documentation: http://localhost:8000/docs
-
 ### 3. Start the Dashboard
 
-Open a new terminal:
-
 ```bash
-cd frontend
 streamlit run app.py
 ```
 
-The dashboard will open at: http://localhost:8501
-
-### 4. Run Analysis
-
-1. Click "🚀 Run Analysis" in the sidebar
-2. Wait for the pipeline to complete
-3. Explore the insights!
-
-## 📊 API Endpoints
+##  API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -146,7 +142,6 @@ The dashboard will open at: http://localhost:8501
 | `/clusters` | GET | Get topic clusters |
 | `/sentiment` | GET | Get sentiment breakdown |
 | `/reviews` | GET | Get filtered reviews |
-| `/report` | GET | Get text report |
 
 ## 🎨 Dashboard Features
 
@@ -154,46 +149,12 @@ The dashboard will open at: http://localhost:8501
 - **Sentiment Pie Chart** - Visual sentiment distribution
 - **Top Issues Bar Chart** - Most frequent complaint categories
 - **Recommendations** - AI-generated action items
-- **Issue Details** - Expandable cards with keywords and samples
 - **Complaints Table** - Searchable list of user complaints
 
-## 📈 Sample Insights
-
-After running the analysis, you'll see insights like:
-
-```
-📊 AI PRODUCT FEEDBACK ANALYSIS REPORT
-============================================================
-
-📈 OVERVIEW
-   Total Reviews Analyzed: 201
-   Positive: 138 (68.7%)
-   Neutral: 6
-   Negative: 57 (28.4%)
-   Product Health Score: 71.6%
-
-🎯 TOP COMPLAINT CATEGORIES
-
-   1. login / account / banned
-      Complaints: 15
-      Impact: 🔴 Critical - Affects core functionality
-
-   2. slow / loading / download
-      Complaints: 12
-      Impact: 🟡 Medium - Affects user experience
-
-💡 RECOMMENDATIONS
-   • 🔐 Account/login issues are prominent. Review authentication flow and ban policies.
-   • ⚡ Performance complaints detected. Consider performance optimization sprint.
-```
-
-## 🔮 Future Improvements
+##  Future Improvements
 
 - [ ] Multilingual support (analyze non-English reviews)
 - [ ] LLM-powered summarization of each cluster
 - [ ] Time-series trend analysis
 - [ ] Competitor comparison
 - [ ] Export to PDF/Excel
-- [ ] Slack/Email notifications
-- [ ] Real-time data ingestion from Play Store API
-

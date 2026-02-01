@@ -108,7 +108,7 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
     if summarizer and combined_all:
         report['overall_summary'] = summarize_text(
             f"User reviews summary: {combined_all}", 
-            summarizer, max_len=200, min_len=50
+            summarizer, max_len=200
         ) or "Could not generate overall summary."
     
     # 2. NEGATIVE REVIEWS SUMMARY - What users are complaining about
@@ -120,7 +120,7 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
         if summarizer and combined_neg:
             report['negative_summary'] = summarize_text(
                 f"Users are complaining that: {combined_neg}",
-                summarizer, max_len=200, min_len=50
+                summarizer, max_len=200
             ) or "Could not generate negative summary."
         
         # Extract actual complaints as quotes
@@ -137,7 +137,7 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
         if summarizer and combined_pos:
             report['positive_summary'] = summarize_text(
                 f"Users love that: {combined_pos}",
-                summarizer, max_len=150, min_len=40
+                summarizer, max_len=150
             ) or "Could not generate positive summary."
         
         # Extract actual praises
@@ -171,7 +171,7 @@ def generate_detailed_ai_summary(df, cluster_info, summarizer):
                     }
                     report[key] = summarize_text(
                         prompt.get(key, combined),
-                        summarizer, max_len=150, min_len=40
+                        summarizer, max_len=150
                     ) or f"Found {len(texts)} reviews about {label}"
     
     # 5. ACTION ITEMS based on actual review content

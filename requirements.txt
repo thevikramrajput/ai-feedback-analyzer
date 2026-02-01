@@ -1,0 +1,23 @@
+# AI Product Feedback Analyzer - Dependencies
+
+# Backend API
+fastapi==0.104.1
+uvicorn==0.24.0
+
+# Data Processing
+pandas==2.1.3
+numpy==1.26.2
+
+# Machine Learning
+scikit-learn==1.3.2
+sentence-transformers==2.2.2
+
+# Frontend Dashboard
+streamlit==1.28.2
+plotly==5.18.0
+
+# HTTP Client
+requests==2.31.0
+
+# Utilities
+python-multipart==0.0.6

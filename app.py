@@ -35,14 +35,19 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .ai-summary-box {
-        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-        padding: 1.5rem;
-        border-radius: 12px;
-        border-left: 4px solid #00d4ff;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 2rem;
+        border-radius: 16px;
+        border: 1px solid #334155;
         margin: 1rem 0;
     }
-    .ai-summary-box h4 { color: #00d4ff !important; margin-top: 0; }
-    .ai-summary-box p { color: #e2e8f0 !important; }
+    .summary-section {
+        background: #1e293b;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 1rem 0;
+        border-left: 4px solid #3b82f6;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,86 +59,116 @@ def load_summarizer():
     """Load the summarization model (cached)."""
     try:
         from transformers import pipeline
-        summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=-1)
+        # Using a smaller, faster model for HF Spaces
+        summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)
         return summarizer
     except Exception as e:
-        st.warning(f"Could not load AI model: {e}")
         return None
 
 
-def generate_ai_summary(reviews_text, summarizer):
-    """Generate AI summary from reviews."""
-    if not summarizer:
+def generate_category_summary(texts, category_name, summarizer):
+    """Generate summary for a specific category of reviews."""
+    if not texts or not summarizer:
         return None
     
     try:
-        # Limit text length for model
-        text = reviews_text[:4000]
-        summary = summarizer(text, max_length=200, min_length=50, do_sample=False)
+        # Combine texts (limit to avoid token limits)
+        combined_text = " ".join([str(t)[:200] for t in texts[:30]])
+        if len(combined_text) < 50:
+            return None
+        
+        # Truncate to model limits
+        combined_text = combined_text[:1024]
+        
+        summary = summarizer(combined_text, max_length=100, min_length=30, do_sample=False)
         return summary[0]['summary_text']
-    except Exception as e:
+    except:
         return None
 
 
-def generate_detailed_insights(df, cluster_info):
-    """Generate detailed insights and improvement recommendations."""
-    insights = {
-        'overview': '',
-        'key_issues': [],
-        'improvements': [],
-        'positive_highlights': []
+def generate_complete_ai_summary(df, cluster_info, summarizer):
+    """Generate a complete AI-powered summary of all reviews."""
+    summary_report = {
+        'executive_summary': '',
+        'areas_to_improve': [],
+        'feature_requests': '',
+        'critical_bugs': '',
+        'login_issues': '',
+        'messaging_issues': '',
+        'positive_feedback': '',
+        'recommendations': []
     }
     
-    # Overview
-    total = len(df)
-    pos_pct = round(len(df[df['sentiment'] == 'positive']) / total * 100, 1) if total > 0 else 0
-    neg_pct = round(len(df[df['sentiment'] == 'negative']) / total * 100, 1) if total > 0 else 0
-    
-    if pos_pct >= 70:
-        insights['overview'] = f"🎉 **Strong Performance!** Your product has {pos_pct}% positive reviews. Users are generally satisfied, but there's still room for improvement."
-    elif pos_pct >= 50:
-        insights['overview'] = f"⚠️ **Mixed Feedback** - {pos_pct}% positive, {neg_pct}% negative. Focus on addressing key pain points to improve user satisfaction."
-    else:
-        insights['overview'] = f"🚨 **Needs Attention** - Only {pos_pct}% positive reviews. Critical issues are impacting user experience and require immediate action."
-    
-    # Key issues from clusters
-    sorted_clusters = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)
-    
-    issue_recommendations = {
-        'Login/Account Issues': '🔐 Review authentication flow, simplify login process, and clarify account policies',
-        'Performance/Bugs': '⚡ Prioritize performance optimization, fix critical bugs, and improve app stability',
-        'Updates/Installation': '📥 Ensure smooth update process, test on various devices, reduce app size',
-        'Notifications/Messaging': '💬 Fix notification delivery, improve message sync, add customization options',
-        'Ads/Spam/Scams': '🚫 Reduce ad frequency, improve ad quality, enhance spam/scam detection',
-        'Feature Requests': '✨ Prioritize most-requested features, communicate roadmap to users'
+    # Generate category-specific summaries
+    category_mapping = {
+        'Login/Account Issues': 'login_issues',
+        'Performance/Bugs': 'critical_bugs',
+        'Feature Requests': 'feature_requests',
+        'Notifications/Messaging': 'messaging_issues'
     }
     
-    for cluster in sorted_clusters[:3]:
-        label = cluster.get('label', 'Unknown')
-        count = cluster.get('count', 0)
-        keywords = cluster.get('keywords', [])
+    for cluster_id, info in cluster_info.items():
+        label = info.get('label', '')
+        texts = info.get('all_texts', info.get('sample_texts', []))
         
-        insights['key_issues'].append({
-            'issue': label,
+        if label in category_mapping and texts:
+            key = category_mapping[label]
+            if summarizer:
+                ai_summary = generate_category_summary(texts, label, summarizer)
+                if ai_summary:
+                    summary_report[key] = ai_summary
+            
+            # Fallback: Generate rule-based summary
+            if not summary_report[key]:
+                keywords = info.get('keywords', [])
+                count = info.get('count', 0)
+                summary_report[key] = f"Found {count} reviews mentioning: {', '.join(keywords[:5])}"
+    
+    # Generate positive feedback summary
+    positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
+    if len(positive_df) > 0 and 'cleaned_content' in positive_df.columns:
+        pos_texts = positive_df['cleaned_content'].tolist()[:20]
+        if summarizer:
+            pos_summary = generate_category_summary(pos_texts, 'Positive', summarizer)
+            if pos_summary:
+                summary_report['positive_feedback'] = pos_summary
+        
+        if not summary_report['positive_feedback']:
+            pos_keywords = extract_keywords(pos_texts, top_n=8)
+            summary_report['positive_feedback'] = f"Users appreciate: {', '.join(pos_keywords)}"
+    
+    # Executive Summary
+    total = len(df)
+    neg_count = len(df[df['sentiment'] == 'negative']) if 'sentiment' in df.columns else 0
+    pos_count = len(df[df['sentiment'] == 'positive']) if 'sentiment' in df.columns else 0
+    
+    summary_report['executive_summary'] = f"""
+    Analyzed {total:,} user reviews. {round(pos_count/total*100, 1)}% positive, {round(neg_count/total*100, 1)}% negative.
+    Top complaint categories identified and summarized below.
+    """
+    
+    # Areas to improve based on clusters
+    sorted_clusters = sorted(cluster_info.values(), key=lambda x: x.get('count', 0), reverse=True)
+    for cluster in sorted_clusters[:4]:
+        count = cluster.get('count', 0)
+        label = cluster.get('label', 'Unknown')
+        keywords = cluster.get('keywords', [])
+        summary_report['areas_to_improve'].append({
+            'area': label,
             'count': count,
             'keywords': keywords
         })
-        
-        if label in issue_recommendations:
-            insights['improvements'].append({
-                'area': label,
-                'action': issue_recommendations[label],
-                'priority': '🔴 High' if count > 20 else '🟡 Medium' if count > 10 else '🟢 Low'
-            })
     
-    # Positive highlights
-    positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
-    if len(positive_df) > 0:
-        pos_keywords = extract_keywords(positive_df['cleaned_content'].tolist() if 'cleaned_content' in positive_df.columns else [], top_n=5)
-        if pos_keywords:
-            insights['positive_highlights'] = pos_keywords
+    # Recommendations
+    summary_report['recommendations'] = [
+        "🔐 **Account & Login**: Simplify authentication flow, reduce ban false-positives" if summary_report.get('login_issues') else None,
+        "⚡ **Performance**: Optimize app speed, fix crash issues, reduce memory usage" if summary_report.get('critical_bugs') else None,
+        "✨ **Features**: Prioritize most-requested features based on user feedback" if summary_report.get('feature_requests') else None,
+        "💬 **Messaging**: Improve notification reliability and message sync" if summary_report.get('messaging_issues') else None,
+    ]
+    summary_report['recommendations'] = [r for r in summary_report['recommendations'] if r]
     
-    return insights
+    return summary_report
 
 
 # ============== DATA PROCESSING FUNCTIONS ==============
@@ -168,7 +203,8 @@ def extract_keywords(texts, top_n=5):
     stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
                  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
                  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'it', 'its',
-                 'this', 'that', 'i', 'me', 'my', 'you', 'your', 'we', 'they', 'app', 'good', 'bad'}
+                 'this', 'that', 'i', 'me', 'my', 'you', 'your', 'we', 'they', 'app', 'good', 'bad',
+                 'not', 'just', 'very', 'much', 'really', 'can', 'get', 'use', 'using', 'one'}
     
     word_counts = Counter()
     for text in texts:
@@ -183,12 +219,12 @@ def simple_cluster(texts, n_clusters=6):
     clusters = {i: [] for i in range(n_clusters)}
     
     issue_keywords = [
-        ['login', 'account', 'password', 'sign', 'ban', 'banned', 'block'],
-        ['slow', 'lag', 'loading', 'crash', 'freeze', 'bug', 'error'],
-        ['update', 'version', 'download', 'install', 'work'],
-        ['notification', 'message', 'chat', 'call', 'video'],
-        ['ads', 'advertisement', 'spam', 'scam', 'fake'],
-        ['feature', 'need', 'want', 'please', 'add', 'missing']
+        ['login', 'account', 'password', 'sign', 'ban', 'banned', 'block', 'access'],
+        ['slow', 'lag', 'loading', 'crash', 'freeze', 'bug', 'error', 'stuck'],
+        ['update', 'version', 'download', 'install', 'work', 'open'],
+        ['notification', 'message', 'chat', 'call', 'video', 'send', 'receive'],
+        ['ads', 'advertisement', 'spam', 'scam', 'fake', 'privacy'],
+        ['feature', 'need', 'want', 'please', 'add', 'missing', 'wish']
     ]
     
     for text in texts:
@@ -204,7 +240,7 @@ def simple_cluster(texts, n_clusters=6):
     
     cluster_info = {}
     labels = ['Login/Account Issues', 'Performance/Bugs', 'Updates/Installation',
-              'Notifications/Messaging', 'Ads/Spam/Scams', 'Feature Requests']
+              'Notifications/Messaging', 'Ads/Spam/Privacy', 'Feature Requests']
     
     for i in range(n_clusters):
         if clusters[i]:
@@ -279,16 +315,12 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
             'Sentiment': row.get('sentiment', 'N/A').title()
         })
     
-    # Generate detailed insights
-    detailed_insights = generate_detailed_insights(df, cluster_info)
-    
     return {
         'summary': summary,
         'top_issues': top_issues,
         'sample_complaints': sample_complaints,
         'cluster_info': cluster_info,
         'filtered_count': len(display_df),
-        'detailed_insights': detailed_insights,
         'processed_df': df
     }
 
@@ -417,54 +449,119 @@ def render_issues_chart(top_issues):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def render_ai_insights(detailed_insights):
-    """Render the AI-generated insights section."""
-    st.subheader("🤖 AI-Powered Insights & Recommendations")
+def render_ai_summary(summary_report):
+    """Render the complete AI-generated summary."""
+    st.markdown("---")
+    st.subheader("🤖 AI-Generated Comprehensive Summary")
     
-    # Overview
-    st.markdown(detailed_insights.get('overview', 'No overview available.'))
+    # Executive Summary
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+                padding: 1.5rem; border-radius: 12px; border: 1px solid #3b82f6; margin-bottom: 1rem;">
+        <h4 style="color: #3b82f6; margin-top: 0;">📋 Executive Summary</h4>
+        <p style="color: #e2e8f0;">{summary_report.get('executive_summary', 'No summary available.')}</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Improvement Recommendations
-    st.markdown("### 💡 Improvement Recommendations")
-    improvements = detailed_insights.get('improvements', [])
+    # Create tabs for different sections
+    tab1, tab2, tab3, tab4 = st.tabs(["� Areas to Improve", "💬 Category Summaries", "✅ Positive Feedback", "💡 Recommendations"])
     
-    if improvements:
-        for imp in improvements:
-            st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-                        padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
-                        border-left: 4px solid #00d4ff;">
-                <strong style="color: #00d4ff;">{imp['area']}</strong> 
-                <span style="color: #94a3b8; float: right;">{imp['priority']}</span>
-                <p style="color: #e2e8f0; margin: 0.5rem 0 0 0;">{imp['action']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("No specific improvements identified.")
-    
-    # Key Issues
-    st.markdown("### 🔍 Key Issues Breakdown")
-    key_issues = detailed_insights.get('key_issues', [])
-    
-    if key_issues:
-        cols = st.columns(len(key_issues[:3]))
-        for i, issue in enumerate(key_issues[:3]):
-            with cols[i]:
+    with tab1:
+        areas = summary_report.get('areas_to_improve', [])
+        if areas:
+            for area in areas:
                 st.markdown(f"""
-                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; text-align: center;">
-                    <div style="font-size: 1.5rem; font-weight: 700; color: #f5576c;">{issue['count']}</div>
-                    <div style="color: #94a3b8; font-size: 0.9rem;">{issue['issue']}</div>
-                    <div style="color: #64748b; font-size: 0.8rem; margin-top: 0.5rem;">
-                        {', '.join(issue['keywords'][:3])}
-                    </div>
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                            border-left: 4px solid #f5576c;">
+                    <strong style="color: #f5576c;">{area['area']}</strong>
+                    <span style="color: #94a3b8; float: right;">{area['count']} complaints</span>
+                    <p style="color: #94a3b8; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        Keywords: {', '.join(area['keywords'][:5])}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No specific areas to improve identified.")
+    
+    with tab2:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Login Issues
+            if summary_report.get('login_issues'):
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                            border-left: 4px solid #ef4444;">
+                    <h5 style="color: #ef4444; margin: 0;">🔐 Login/Account Issues</h5>
+                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        {summary_report['login_issues']}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Bugs
+            if summary_report.get('critical_bugs'):
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                            border-left: 4px solid #f97316;">
+                    <h5 style="color: #f97316; margin: 0;">🐛 Performance/Bugs</h5>
+                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        {summary_report['critical_bugs']}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            # Feature Requests
+            if summary_report.get('feature_requests'):
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                            border-left: 4px solid #a855f7;">
+                    <h5 style="color: #a855f7; margin: 0;">✨ Feature Requests</h5>
+                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        {summary_report['feature_requests']}
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Messaging
+            if summary_report.get('messaging_issues'):
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                            border-left: 4px solid #06b6d4;">
+                    <h5 style="color: #06b6d4; margin: 0;">💬 Messaging Issues</h5>
+                    <p style="color: #e2e8f0; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        {summary_report['messaging_issues']}
+                    </p>
                 </div>
                 """, unsafe_allow_html=True)
     
-    # Positive Highlights
-    pos_highlights = detailed_insights.get('positive_highlights', [])
-    if pos_highlights:
-        st.markdown("### ✅ What Users Love")
-        st.markdown(f"**Top positive keywords:** {', '.join(pos_highlights)}")
+    with tab3:
+        if summary_report.get('positive_feedback'):
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+                        padding: 1.5rem; border-radius: 12px; border: 1px solid #10b981;">
+                <h5 style="color: #10b981; margin: 0;">😊 What Users Love</h5>
+                <p style="color: #e2e8f0; margin: 0.5rem 0 0 0;">
+                    {summary_report['positive_feedback']}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.info("No positive feedback summary available.")
+    
+    with tab4:
+        recommendations = summary_report.get('recommendations', [])
+        if recommendations:
+            for rec in recommendations:
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                            border-left: 4px solid #3b82f6;">
+                    <p style="color: #e2e8f0; margin: 0;">{rec}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("No critical recommendations at this time.")
 
 
 def render_category_details(top_issues):
@@ -481,7 +578,7 @@ def render_category_details(top_issues):
         'Performance/Bugs': '🐛',
         'Updates/Installation': '📥',
         'Notifications/Messaging': '💬',
-        'Ads/Spam/Scams': '🚫',
+        'Ads/Spam/Privacy': '🚫',
         'Feature Requests': '✨'
     }
     
@@ -518,6 +615,8 @@ def main():
     
     if 'df' not in st.session_state:
         st.session_state.df = None
+    if 'ai_summary' not in st.session_state:
+        st.session_state.ai_summary = None
     
     # Sidebar
     with st.sidebar:
@@ -533,6 +632,7 @@ def main():
             uploaded_file = st.file_uploader("Upload CSV with reviews", type=['csv'])
             if uploaded_file:
                 st.session_state.df = pd.read_csv(uploaded_file)
+                st.session_state.ai_summary = None  # Reset summary
                 st.success(f"✅ Uploaded {len(st.session_state.df):,} reviews")
         else:
             if st.session_state.df is None:
@@ -558,7 +658,7 @@ def main():
         
         st.divider()
         st.caption("AI Product Feedback Analyzer v2.0")
-        st.caption("🤖 Powered by AI")
+        st.caption("🤖 Powered by DistilBART")
     
     # Main content
     df = st.session_state.df
@@ -582,10 +682,23 @@ def main():
             with col2:
                 render_issues_chart(results['top_issues'])
             
-            st.divider()
+            # AI Summary Generation Button
+            st.markdown("---")
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                if st.button("🤖 Generate AI Summary", type="primary", use_container_width=True):
+                    with st.spinner("🧠 AI is analyzing all reviews... This may take a minute..."):
+                        summarizer = load_summarizer()
+                        ai_summary = generate_complete_ai_summary(
+                            results['processed_df'], 
+                            results['cluster_info'], 
+                            summarizer
+                        )
+                        st.session_state.ai_summary = ai_summary
             
-            # AI Insights Section
-            render_ai_insights(results['detailed_insights'])
+            # Display AI Summary if generated
+            if st.session_state.ai_summary:
+                render_ai_summary(st.session_state.ai_summary)
             
             st.divider()
             

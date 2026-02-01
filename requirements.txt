@@ -11,6 +11,10 @@ numpy
 # Machine Learning
 scikit-learn
 
+# NLP / AI Models
+transformers
+torch
+
 # Frontend Dashboard
 streamlit
 plotly

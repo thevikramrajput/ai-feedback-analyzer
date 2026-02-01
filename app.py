@@ -1,6 +1,6 @@
 """
 AI Product Feedback Analyzer - Streamlit Dashboard
-Hugging Face Spaces Compatible Version
+Hugging Face Spaces Compatible Version with AI Summarization
 """
 
 import streamlit as st
@@ -34,8 +34,106 @@ st.markdown("""
     h2, h3 { color: #f8fafc !important; }
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    .ai-summary-box {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
+        border-left: 4px solid #00d4ff;
+        margin: 1rem 0;
+    }
+    .ai-summary-box h4 { color: #00d4ff !important; margin-top: 0; }
+    .ai-summary-box p { color: #e2e8f0 !important; }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ============== AI SUMMARIZATION ==============
+
+@st.cache_resource
+def load_summarizer():
+    """Load the summarization model (cached)."""
+    try:
+        from transformers import pipeline
+        summarizer = pipeline("summarization", model="facebook/bart-large-cnn", device=-1)
+        return summarizer
+    except Exception as e:
+        st.warning(f"Could not load AI model: {e}")
+        return None
+
+
+def generate_ai_summary(reviews_text, summarizer):
+    """Generate AI summary from reviews."""
+    if not summarizer:
+        return None
+    
+    try:
+        # Limit text length for model
+        text = reviews_text[:4000]
+        summary = summarizer(text, max_length=200, min_length=50, do_sample=False)
+        return summary[0]['summary_text']
+    except Exception as e:
+        return None
+
+
+def generate_detailed_insights(df, cluster_info):
+    """Generate detailed insights and improvement recommendations."""
+    insights = {
+        'overview': '',
+        'key_issues': [],
+        'improvements': [],
+        'positive_highlights': []
+    }
+    
+    # Overview
+    total = len(df)
+    pos_pct = round(len(df[df['sentiment'] == 'positive']) / total * 100, 1) if total > 0 else 0
+    neg_pct = round(len(df[df['sentiment'] == 'negative']) / total * 100, 1) if total > 0 else 0
+    
+    if pos_pct >= 70:
+        insights['overview'] = f"🎉 **Strong Performance!** Your product has {pos_pct}% positive reviews. Users are generally satisfied, but there's still room for improvement."
+    elif pos_pct >= 50:
+        insights['overview'] = f"⚠️ **Mixed Feedback** - {pos_pct}% positive, {neg_pct}% negative. Focus on addressing key pain points to improve user satisfaction."
+    else:
+        insights['overview'] = f"🚨 **Needs Attention** - Only {pos_pct}% positive reviews. Critical issues are impacting user experience and require immediate action."
+    
+    # Key issues from clusters
+    sorted_clusters = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)
+    
+    issue_recommendations = {
+        'Login/Account Issues': '🔐 Review authentication flow, simplify login process, and clarify account policies',
+        'Performance/Bugs': '⚡ Prioritize performance optimization, fix critical bugs, and improve app stability',
+        'Updates/Installation': '📥 Ensure smooth update process, test on various devices, reduce app size',
+        'Notifications/Messaging': '💬 Fix notification delivery, improve message sync, add customization options',
+        'Ads/Spam/Scams': '🚫 Reduce ad frequency, improve ad quality, enhance spam/scam detection',
+        'Feature Requests': '✨ Prioritize most-requested features, communicate roadmap to users'
+    }
+    
+    for cluster in sorted_clusters[:3]:
+        label = cluster.get('label', 'Unknown')
+        count = cluster.get('count', 0)
+        keywords = cluster.get('keywords', [])
+        
+        insights['key_issues'].append({
+            'issue': label,
+            'count': count,
+            'keywords': keywords
+        })
+        
+        if label in issue_recommendations:
+            insights['improvements'].append({
+                'area': label,
+                'action': issue_recommendations[label],
+                'priority': '🔴 High' if count > 20 else '🟡 Medium' if count > 10 else '🟢 Low'
+            })
+    
+    # Positive highlights
+    positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
+    if len(positive_df) > 0:
+        pos_keywords = extract_keywords(positive_df['cleaned_content'].tolist() if 'cleaned_content' in positive_df.columns else [], top_n=5)
+        if pos_keywords:
+            insights['positive_highlights'] = pos_keywords
+    
+    return insights
 
 
 # ============== DATA PROCESSING FUNCTIONS ==============
@@ -114,8 +212,8 @@ def simple_cluster(texts, n_clusters=6):
                 'label': labels[i] if i < len(labels) else f'Topic {i}',
                 'keywords': extract_keywords(clusters[i]),
                 'count': len(clusters[i]),
-                'sample_texts': clusters[i][:10],  # Store more samples for display
-                'all_texts': clusters[i]  # Store all texts for category view
+                'sample_texts': clusters[i][:10],
+                'all_texts': clusters[i]
             }
     
     return cluster_info
@@ -125,7 +223,6 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
     """Full processing pipeline with filters."""
     df = df.copy()
     
-    # Ensure content column exists
     if 'content' not in df.columns:
         text_cols = [col for col in df.columns if 'text' in col.lower() or 'review' in col.lower() or 'content' in col.lower()]
         if text_cols:
@@ -133,23 +230,19 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
         else:
             return None
     
-    # Clean and filter
     df = df.dropna(subset=['content'])
     df = df[df['content'].astype(str).str.strip() != ''].copy()
     df['cleaned_content'] = df['content'].apply(clean_text)
     df = df[df['cleaned_content'].str.strip() != ''].copy()
     
-    # Add sentiment
     if 'score' in df.columns:
         df['sentiment'] = df['score'].apply(score_to_sentiment)
     else:
         df['sentiment'] = 'neutral'
     
-    # Apply app filter
     if app_filter != "All" and 'app_id' in df.columns:
         df = df[df['app_id'] == app_filter].copy()
     
-    # Calculate totals
     total = len(df)
     if total == 0:
         return None
@@ -158,16 +251,13 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
     negative_count = len(df[df['sentiment'] == 'negative'])
     neutral_count = len(df[df['sentiment'] == 'neutral'])
     
-    # Apply sentiment filter for display
     display_df = df.copy()
     if sentiment_filter != "All":
         display_df = df[df['sentiment'] == sentiment_filter.lower()].copy()
     
-    # Cluster negative reviews
     negative_df = df[df['sentiment'] == 'negative']
     cluster_info = simple_cluster(negative_df['cleaned_content'].tolist()) if len(negative_df) > 0 else {}
     
-    # Summary
     summary = {
         'total_reviews': total,
         'positive_count': positive_count,
@@ -180,7 +270,6 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
     
     top_issues = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)[:6]
     
-    # Sample reviews
     sample_df = display_df if sentiment_filter != "All" else negative_df
     sample_complaints = []
     for _, row in sample_df.head(15).iterrows():
@@ -190,12 +279,17 @@ def process_data(df, sentiment_filter="All", app_filter="All"):
             'Sentiment': row.get('sentiment', 'N/A').title()
         })
     
+    # Generate detailed insights
+    detailed_insights = generate_detailed_insights(df, cluster_info)
+    
     return {
         'summary': summary,
         'top_issues': top_issues,
         'sample_complaints': sample_complaints,
         'cluster_info': cluster_info,
-        'filtered_count': len(display_df)
+        'filtered_count': len(display_df),
+        'detailed_insights': detailed_insights,
+        'processed_df': df
     }
 
 
@@ -323,6 +417,56 @@ def render_issues_chart(top_issues):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def render_ai_insights(detailed_insights):
+    """Render the AI-generated insights section."""
+    st.subheader("🤖 AI-Powered Insights & Recommendations")
+    
+    # Overview
+    st.markdown(detailed_insights.get('overview', 'No overview available.'))
+    
+    # Improvement Recommendations
+    st.markdown("### 💡 Improvement Recommendations")
+    improvements = detailed_insights.get('improvements', [])
+    
+    if improvements:
+        for imp in improvements:
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+                        padding: 1rem; border-radius: 8px; margin: 0.5rem 0;
+                        border-left: 4px solid #00d4ff;">
+                <strong style="color: #00d4ff;">{imp['area']}</strong> 
+                <span style="color: #94a3b8; float: right;">{imp['priority']}</span>
+                <p style="color: #e2e8f0; margin: 0.5rem 0 0 0;">{imp['action']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No specific improvements identified.")
+    
+    # Key Issues
+    st.markdown("### 🔍 Key Issues Breakdown")
+    key_issues = detailed_insights.get('key_issues', [])
+    
+    if key_issues:
+        cols = st.columns(len(key_issues[:3]))
+        for i, issue in enumerate(key_issues[:3]):
+            with cols[i]:
+                st.markdown(f"""
+                <div style="background: #1e293b; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem; font-weight: 700; color: #f5576c;">{issue['count']}</div>
+                    <div style="color: #94a3b8; font-size: 0.9rem;">{issue['issue']}</div>
+                    <div style="color: #64748b; font-size: 0.8rem; margin-top: 0.5rem;">
+                        {', '.join(issue['keywords'][:3])}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Positive Highlights
+    pos_highlights = detailed_insights.get('positive_highlights', [])
+    if pos_highlights:
+        st.markdown("### ✅ What Users Love")
+        st.markdown(f"**Top positive keywords:** {', '.join(pos_highlights)}")
+
+
 def render_category_details(top_issues):
     """Render expandable sections for each category with reviews."""
     st.subheader("📂 Reviews by Category")
@@ -332,7 +476,6 @@ def render_category_details(top_issues):
         st.info("No categories found.")
         return
     
-    # Category icons
     icons = {
         'Login/Account Issues': '🔐',
         'Performance/Bugs': '🐛',
@@ -350,15 +493,13 @@ def render_category_details(top_issues):
         all_texts = issue.get('all_texts', issue.get('sample_texts', []))
         
         with st.expander(f"{icon} {label} ({count} reviews)", expanded=False):
-            # Keywords
             if keywords:
                 st.markdown(f"**🏷️ Keywords:** {', '.join(keywords)}")
             
             st.markdown("---")
             
-            # Show reviews in a table
             if all_texts:
-                reviews_to_show = all_texts[:20]  # Show up to 20 reviews
+                reviews_to_show = all_texts[:20]
                 reviews_df = pd.DataFrame({
                     'Review': [str(text)[:300] + ('...' if len(str(text)) > 300 else '') for text in reviews_to_show]
                 })
@@ -375,7 +516,6 @@ def render_category_details(top_issues):
 def main():
     render_header()
     
-    # Initialize session state
     if 'df' not in st.session_state:
         st.session_state.df = None
     
@@ -383,7 +523,6 @@ def main():
     with st.sidebar:
         st.title("📁 Data Source")
         
-        # Data source selection
         data_source = st.radio(
             "Choose data source:",
             ["📊 Sample Dataset", "📤 Upload CSV"],
@@ -396,7 +535,6 @@ def main():
                 st.session_state.df = pd.read_csv(uploaded_file)
                 st.success(f"✅ Uploaded {len(st.session_state.df):,} reviews")
         else:
-            # Auto-load sample data
             if st.session_state.df is None:
                 st.session_state.df = load_sample_data()
             if st.session_state.df is not None:
@@ -406,7 +544,6 @@ def main():
         
         st.divider()
         
-        # Filters
         st.subheader("🔍 Filters")
         
         sentiment_filter = st.selectbox(
@@ -414,25 +551,23 @@ def main():
             ["All", "Positive", "Neutral", "Negative"]
         )
         
-        # App filter (if app_id column exists)
         app_filter = "All"
         if st.session_state.df is not None and 'app_id' in st.session_state.df.columns:
             apps = ["All"] + list(st.session_state.df['app_id'].dropna().unique())
             app_filter = st.selectbox("App", apps)
         
         st.divider()
-        st.caption("AI Product Feedback Analyzer v1.0")
+        st.caption("AI Product Feedback Analyzer v2.0")
+        st.caption("🤖 Powered by AI")
     
     # Main content
     df = st.session_state.df
     
     if df is not None:
-        # Process data with filters
         with st.spinner("🔍 Analyzing reviews..."):
             results = process_data(df, sentiment_filter, app_filter)
         
         if results:
-            # Show filter info
             if sentiment_filter != "All" or app_filter != "All":
                 st.info(f"📌 Showing {results['filtered_count']:,} reviews | Filters: Sentiment={sentiment_filter}, App={app_filter}")
             
@@ -449,7 +584,12 @@ def main():
             
             st.divider()
             
-            # Category Details - Expandable sections
+            # AI Insights Section
+            render_ai_insights(results['detailed_insights'])
+            
+            st.divider()
+            
+            # Category Details
             render_category_details(results['top_issues'])
             
             st.divider()

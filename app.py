@@ -575,7 +575,7 @@ def render_ai_summary(report):
 
 
 def render_category_details(top_issues):
-    """Render expandable sections for each category with reviews."""
+    """Render expandable sections for each category with ALL reviews."""
     st.subheader("📂 Reviews by Category")
     
     if not top_issues:
@@ -605,14 +605,13 @@ def render_category_details(top_issues):
             st.markdown("---")
             
             if all_texts:
-                reviews_to_show = all_texts[:20]
+                # Show ALL reviews with pagination
                 reviews_df = pd.DataFrame({
-                    'Review': [str(text)[:300] + ('...' if len(str(text)) > 300 else '') for text in reviews_to_show]
+                    '#': range(1, len(all_texts) + 1),
+                    'Review': [str(text)[:500] for text in all_texts]
                 })
-                st.dataframe(reviews_df, use_container_width=True, hide_index=True)
-                
-                if len(all_texts) > 20:
-                    st.caption(f"Showing 20 of {len(all_texts)} reviews")
+                st.dataframe(reviews_df, use_container_width=True, hide_index=True, height=400)
+                st.success(f"Showing all {len(all_texts)} reviews in this category")
 
 
 # ============== MAIN APP ==============
@@ -699,9 +698,25 @@ def main():
             render_category_details(results['top_issues'])
             
             st.divider()
-            st.subheader(f"📋 Sample Reviews ({sentiment_filter})")
-            if results['sample_complaints']:
-                st.dataframe(pd.DataFrame(results['sample_complaints']), use_container_width=True, hide_index=True)
+            
+            # All Reviews section
+            st.subheader(f"📋 All Reviews ({sentiment_filter})")
+            if 'processed_df' in results and len(results['processed_df']) > 0:
+                display_df = results['processed_df'].copy()
+                if sentiment_filter != "All":
+                    display_df = display_df[display_df['sentiment'] == sentiment_filter.lower()]
+                
+                if len(display_df) > 0:
+                    all_reviews_df = pd.DataFrame({
+                        '#': range(1, len(display_df) + 1),
+                        'Review': display_df['content'].astype(str).tolist(),
+                        'Score': display_df['score'].tolist() if 'score' in display_df.columns else ['N/A'] * len(display_df),
+                        'Sentiment': display_df['sentiment'].str.title().tolist() if 'sentiment' in display_df.columns else ['N/A'] * len(display_df)
+                    })
+                    st.dataframe(all_reviews_df, use_container_width=True, hide_index=True, height=500)
+                    st.success(f"Showing all {len(display_df)} reviews")
+                else:
+                    st.info("No reviews match the current filter.")
     else:
         st.info("👈 Select a data source to get started!")
 

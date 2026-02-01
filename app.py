@@ -9,7 +9,6 @@ import plotly.graph_objects as go
 import re
 import os
 from collections import Counter
-import numpy as np
 
 # Page configuration
 st.set_page_config(
@@ -48,18 +47,22 @@ def clean_text(text):
     text = text.lower()
     text = re.sub(r'http\S+|www\.\S+', '', text)
     text = re.sub(r'\S+@\S+', '', text)
-    text = re.sub(r'[^\w\s.,!?\'"-]', ' ', text)
+    text = re.sub(r'[^\w\s.,!?\'\"-]', ' ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
 def score_to_sentiment(score):
     """Convert star rating to sentiment."""
-    if score <= 2:
-        return 'negative'
-    elif score == 3:
+    try:
+        score = int(score)
+        if score <= 2:
+            return 'negative'
+        elif score == 3:
+            return 'neutral'
+        return 'positive'
+    except:
         return 'neutral'
-    return 'positive'
 
 
 def extract_keywords(texts, top_n=5):
@@ -80,7 +83,6 @@ def extract_keywords(texts, top_n=5):
 def simple_cluster(texts, n_clusters=6):
     """Simple keyword-based clustering."""
     clusters = {i: [] for i in range(n_clusters)}
-    keywords_per_cluster = {}
     
     # Simple keyword matching for clustering
     issue_keywords = [
@@ -92,7 +94,7 @@ def simple_cluster(texts, n_clusters=6):
         ['feature', 'need', 'want', 'please', 'add', 'missing']
     ]
     
-    for idx, text in enumerate(texts):
+    for text in texts:
         text_lower = str(text).lower()
         assigned = False
         for cluster_id, keywords in enumerate(issue_keywords):
@@ -122,33 +124,75 @@ def simple_cluster(texts, n_clusters=6):
 
 def process_data(df):
     """Full processing pipeline."""
-    # Filter English
+    # Make a copy
+    df = df.copy()
+    
+    # Filter English reviews if userLang column exists
     if 'userLang' in df.columns:
-        df = df[df['userLang'].str.upper() == 'EN'].copy()
+        # Handle NaN values and filter
+        df['userLang'] = df['userLang'].fillna('')
+        df = df[df['userLang'].str.strip().str.upper().isin(['EN', 'ENGLISH', ''])].copy()
     
-    # Clean and label
+    # Ensure content column exists
+    if 'content' not in df.columns:
+        # Try to find a text column
+        text_cols = [col for col in df.columns if 'text' in col.lower() or 'review' in col.lower() or 'content' in col.lower()]
+        if text_cols:
+            df['content'] = df[text_cols[0]]
+        else:
+            return {
+                'summary': {'total_reviews': 0, 'positive_count': 0, 'negative_count': 0, 
+                           'neutral_count': 0, 'positive_percentage': 0, 'negative_percentage': 0, 'health_score': 100},
+                'top_issues': [],
+                'sample_complaints': [],
+                'cluster_info': {}
+            }
+    
+    # Clean and filter
     df = df.dropna(subset=['content'])
+    df = df[df['content'].astype(str).str.strip() != ''].copy()
     df['cleaned_content'] = df['content'].apply(clean_text)
-    df = df[df['cleaned_content'].str.strip() != '']
+    df = df[df['cleaned_content'].str.strip() != ''].copy()
     
+    # Add sentiment based on score
     if 'score' in df.columns:
         df['sentiment'] = df['score'].apply(score_to_sentiment)
+    else:
+        # Default to neutral if no score
+        df['sentiment'] = 'neutral'
+    
+    # Calculate totals
+    total = len(df)
+    if total == 0:
+        return {
+            'summary': {'total_reviews': 0, 'positive_count': 0, 'negative_count': 0, 
+                       'neutral_count': 0, 'positive_percentage': 0, 'negative_percentage': 0, 'health_score': 100},
+            'top_issues': [],
+            'sample_complaints': [],
+            'cluster_info': {}
+        }
+    
+    positive_count = len(df[df['sentiment'] == 'positive'])
+    negative_count = len(df[df['sentiment'] == 'negative'])
+    neutral_count = len(df[df['sentiment'] == 'neutral'])
     
     # Cluster negative reviews
-    negative_df = df[df['sentiment'] == 'negative'] if 'sentiment' in df.columns else df
-    cluster_info = simple_cluster(negative_df['cleaned_content'].tolist())
+    negative_df = df[df['sentiment'] == 'negative']
+    if len(negative_df) > 0:
+        cluster_info = simple_cluster(negative_df['cleaned_content'].tolist())
+    else:
+        cluster_info = {}
     
     # Generate summary
-    total = len(df)
     summary = {
         'total_reviews': total,
-        'positive_count': len(df[df['sentiment'] == 'positive']) if 'sentiment' in df.columns else 0,
-        'negative_count': len(df[df['sentiment'] == 'negative']) if 'sentiment' in df.columns else 0,
-        'neutral_count': len(df[df['sentiment'] == 'neutral']) if 'sentiment' in df.columns else 0,
+        'positive_count': positive_count,
+        'negative_count': negative_count,
+        'neutral_count': neutral_count,
+        'positive_percentage': round(positive_count / total * 100, 1),
+        'negative_percentage': round(negative_count / total * 100, 1),
+        'health_score': round(100 - (negative_count / total * 100), 1)
     }
-    summary['positive_percentage'] = round(summary['positive_count'] / total * 100, 1) if total > 0 else 0
-    summary['negative_percentage'] = round(summary['negative_count'] / total * 100, 1) if total > 0 else 0
-    summary['health_score'] = round(100 - summary['negative_percentage'], 1)
     
     # Top issues
     top_issues = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)[:5]
@@ -157,7 +201,7 @@ def process_data(df):
     sample_complaints = []
     for _, row in negative_df.head(10).iterrows():
         sample_complaints.append({
-            'content': row.get('content', ''),
+            'content': str(row.get('content', ''))[:200],
             'score': row.get('score', 'N/A'),
             'cluster': 'Complaint'
         })
@@ -289,56 +333,74 @@ def main():
         
         uploaded_file = st.file_uploader("Upload CSV with reviews", type=['csv'])
         
-        use_sample = st.checkbox("Use sample data", value=True)
+        use_sample = st.checkbox("Use sample data", value=False)
         
         st.divider()
         st.caption("AI Product Feedback Analyzer v1.0")
     
     # Main content
-    if uploaded_file is not None or use_sample:
+    df = None
+    
+    if uploaded_file is not None:
         try:
-            if uploaded_file:
-                df = pd.read_csv(uploaded_file)
-                st.sidebar.success(f"✅ Loaded {len(df)} reviews")
-            else:
-                # Try to load sample data
-                data_path = os.path.join(os.path.dirname(__file__), 'data', 'Training_Data.csv')
-                if not os.path.exists(data_path):
-                    data_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'Training_Data.csv')
-                
-                if os.path.exists(data_path):
+            df = pd.read_csv(uploaded_file)
+            st.sidebar.success(f"✅ Loaded {len(df)} reviews")
+        except Exception as e:
+            st.sidebar.error(f"Error loading file: {e}")
+    elif use_sample:
+        # Try to load sample data
+        data_paths = [
+            os.path.join(os.path.dirname(__file__), 'data', 'Training_Data.csv'),
+            'data/Training_Data.csv',
+            './data/Training_Data.csv'
+        ]
+        for data_path in data_paths:
+            if os.path.exists(data_path):
+                try:
                     df = pd.read_csv(data_path)
                     st.sidebar.success(f"✅ Loaded {len(df)} sample reviews")
-                else:
-                    st.warning("Please upload a CSV file with 'content' and 'score' columns.")
-                    return
-            
-            # Process data
-            with st.spinner("🔍 Analyzing reviews..."):
-                results = process_data(df)
-            
-            # Display results
-            render_kpi_cards(results['summary'])
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                render_sentiment_chart(results['summary'])
-            with col2:
-                render_issues_chart(results['top_issues'])
-            
-            st.divider()
-            
-            # Sample complaints
-            st.subheader("📋 Sample Complaints")
-            if results['sample_complaints']:
-                complaints_df = pd.DataFrame(results['sample_complaints'])
-                st.dataframe(complaints_df, use_container_width=True, hide_index=True)
-            
-        except Exception as e:
-            st.error(f"Error processing data: {e}")
+                    break
+                except:
+                    continue
+        
+        if df is None:
+            st.sidebar.warning("Sample data not found. Please upload a CSV.")
+    
+    if df is not None:
+        # Show columns for debugging
+        st.sidebar.caption(f"Columns: {', '.join(df.columns[:5])}...")
+        
+        # Process data
+        with st.spinner("🔍 Analyzing reviews..."):
+            results = process_data(df)
+        
+        # Display results
+        render_kpi_cards(results['summary'])
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            render_sentiment_chart(results['summary'])
+        with col2:
+            render_issues_chart(results['top_issues'])
+        
+        st.divider()
+        
+        # Sample complaints
+        st.subheader("📋 Sample Complaints")
+        if results['sample_complaints']:
+            complaints_df = pd.DataFrame(results['sample_complaints'])
+            st.dataframe(complaints_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No negative reviews found.")
     else:
-        st.info("👈 Upload a CSV file or check 'Use sample data' to get started!")
+        st.info("👈 Upload a CSV file with 'content' and 'score' columns to analyze reviews!")
+        st.markdown("""
+        **Expected CSV format:**
+        - `content` - Review text
+        - `score` - Star rating (1-5)
+        - `userLang` (optional) - Language code (e.g., 'EN')
+        """)
 
 
 if __name__ == "__main__":

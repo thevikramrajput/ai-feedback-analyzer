@@ -1,7 +1,6 @@
 """
 AI Product Feedback Analyzer - Streamlit Dashboard
-Hugging Face Spaces Compatible Version with AI Summarization
-Version: 3.0 - Pastel UI Redesign
+Version: 4.0 - Premium Glassmorphism UI
 """
 
 import streamlit as st
@@ -11,19 +10,6 @@ import re
 import os
 from collections import Counter
 
-# ============== COLOR PALETTE ==============
-COLORS = {
-    'soft_blue': '#99CDD8',
-    'mint': '#DAEBE3',
-    'cream': '#FDE8D3',
-    'peach': '#F3C3B2',
-    'sage': '#CFDBC4',
-    'text': '#657166',
-    'text_light': '#7d8a7e',
-    'white': '#FFFFFF',
-    'shadow': 'rgba(101, 113, 102, 0.1)'
-}
-
 # Page configuration
 st.set_page_config(
     page_title="AI Product Feedback Analyzer",
@@ -32,223 +18,282 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS with Pastel Color Palette
-st.markdown(f"""
+# ============== PREMIUM CSS WITH GLASSMORPHISM ==============
+st.markdown("""
 <style>
-    /* Main Background */
-    .stApp {{
-        background: linear-gradient(135deg, {COLORS['mint']} 0%, {COLORS['soft_blue']} 100%);
-    }}
+    /* Import Google Font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     
-    /* Sidebar */
-    [data-testid="stSidebar"] {{
-        background: {COLORS['sage']} !important;
-    }}
-    [data-testid="stSidebar"] * {{
-        color: {COLORS['text']} !important;
-    }}
-    [data-testid="stSidebar"] .stRadio label {{
-        color: {COLORS['text']} !important;
-    }}
+    /* Main Background - Gradient */
+    .stApp {
+        background: linear-gradient(135deg, #99CDD8 0%, #DAEBE3 50%, #CFDBC4 100%);
+        font-family: 'Inter', 'Segoe UI', sans-serif;
+    }
     
-    /* Main Header */
-    .main-header {{
-        background: linear-gradient(135deg, {COLORS['cream']} 0%, {COLORS['peach']} 100%);
-        padding: 2rem;
-        border-radius: 20px;
+    /* Sidebar - Frosted Glass */
+    [data-testid="stSidebar"] {
+        background: rgba(207, 219, 196, 0.85) !important;
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(255,255,255,0.3);
+    }
+    [data-testid="stSidebar"] * {
+        color: #657166 !important;
+    }
+    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
+        color: #4a5548 !important;
+        font-weight: 600;
+    }
+    
+    /* Hide Streamlit defaults */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Hero Header Card */
+    .hero-card {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        padding: 2.5rem 3rem;
+        border-radius: 24px;
+        box-shadow: 0 8px 32px rgba(101, 113, 102, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        text-align: center;
         margin-bottom: 2rem;
-        text-align: center;
-        box-shadow: 0 8px 32px {COLORS['shadow']};
-        border: 1px solid rgba(255,255,255,0.3);
-    }}
-    .main-header h1 {{
+    }
+    .hero-card h1 {
+        color: #4a5548;
+        font-size: 2.8rem;
+        font-weight: 700;
         margin: 0;
-        font-size: 2.5rem;
-        color: {COLORS['text']} !important;
-        font-weight: 700;
-    }}
-    .main-header p {{
-        margin: 0.5rem 0 0 0;
-        color: {COLORS['text_light']} !important;
-        font-size: 1.1rem;
-    }}
+        letter-spacing: -0.5px;
+    }
+    .hero-card p {
+        color: #657166;
+        font-size: 1.15rem;
+        margin: 0.8rem 0 0 0;
+        font-weight: 400;
+    }
     
-    /* Headings */
-    h1, h2, h3, h4, h5, h6 {{
-        color: {COLORS['text']} !important;
-    }}
-    
-    /* Text */
-    p, span, div, label {{
-        color: {COLORS['text']};
-    }}
-    
-    /* Buttons */
-    .stButton > button {{
-        background: linear-gradient(135deg, {COLORS['peach']} 0%, {COLORS['cream']} 100%) !important;
-        color: {COLORS['text']} !important;
-        border: none !important;
-        border-radius: 12px !important;
-        padding: 0.75rem 2rem !important;
-        font-weight: 600 !important;
-        box-shadow: 0 4px 15px {COLORS['shadow']} !important;
-        transition: all 0.3s ease !important;
-    }}
-    .stButton > button:hover {{
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px {COLORS['shadow']} !important;
-    }}
-    .stButton > button[kind="primary"] {{
-        background: linear-gradient(135deg, {COLORS['soft_blue']} 0%, {COLORS['sage']} 100%) !important;
-    }}
-    
-    /* Select boxes */
-    .stSelectbox > div > div {{
-        background: {COLORS['white']} !important;
-        border: 2px solid {COLORS['sage']} !important;
-        border-radius: 10px !important;
-        color: {COLORS['text']} !important;
-    }}
-    
-    /* File uploader */
-    .stFileUploader {{
-        background: {COLORS['white']} !important;
-        border-radius: 12px !important;
-        border: 2px dashed {COLORS['sage']} !important;
-    }}
-    
-    /* Expanders */
-    .streamlit-expanderHeader {{
-        background: {COLORS['cream']} !important;
-        border-radius: 10px !important;
-        color: {COLORS['text']} !important;
-    }}
-    
-    /* Dataframes */
-    .stDataFrame {{
-        border-radius: 12px !important;
-        overflow: hidden !important;
-    }}
-    [data-testid="stDataFrame"] {{
-        background: {COLORS['white']} !important;
-        border-radius: 12px !important;
-        box-shadow: 0 4px 15px {COLORS['shadow']} !important;
-    }}
-    
-    /* Metrics */
-    [data-testid="stMetricValue"] {{
-        color: {COLORS['text']} !important;
-    }}
-    
-    /* Success/Info messages */
-    .stSuccess {{
-        background: {COLORS['sage']} !important;
-        color: {COLORS['text']} !important;
-    }}
-    .stInfo {{
-        background: {COLORS['soft_blue']} !important;
-        color: {COLORS['text']} !important;
-    }}
-    
-    /* Spinner */
-    .stSpinner > div {{
-        border-color: {COLORS['peach']} !important;
-    }}
-    
-    /* Hide default elements */
-    #MainMenu {{visibility: hidden;}}
-    footer {{visibility: hidden;}}
-    
-    /* Cards */
-    .kpi-card {{
-        padding: 1.5rem;
-        border-radius: 16px;
+    /* Glass KPI Cards */
+    .kpi-card {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 1.8rem 1.5rem;
+        border-radius: 20px;
         text-align: center;
-        box-shadow: 0 4px 20px {COLORS['shadow']};
-        border: 1px solid rgba(255,255,255,0.5);
-        transition: transform 0.3s ease;
-    }}
-    .kpi-card:hover {{
-        transform: translateY(-4px);
-    }}
-    .kpi-value {{
-        font-size: 2.5rem;
+        box-shadow: 0 8px 32px rgba(101, 113, 102, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        transition: all 0.3s ease;
+    }
+    .kpi-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 16px 48px rgba(101, 113, 102, 0.18);
+    }
+    .kpi-value {
+        font-size: 2.8rem;
         font-weight: 700;
-        color: {COLORS['text']};
-    }}
-    .kpi-label {{
+        color: #4a5548;
+        line-height: 1;
+    }
+    .kpi-label {
         font-size: 0.95rem;
-        color: {COLORS['text_light']};
-        margin-top: 0.5rem;
-    }}
+        color: #657166;
+        margin-top: 0.6rem;
+        font-weight: 500;
+    }
+    .kpi-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
     
-    /* Summary cards */
-    .summary-card {{
-        background: {COLORS['white']};
+    /* Section Cards - Glass */
+    .section-card {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 1.8rem;
+        border-radius: 20px;
+        box-shadow: 0 6px 24px rgba(101, 113, 102, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        margin: 1rem 0;
+    }
+    .section-card h3 {
+        color: #4a5548 !important;
+        font-weight: 600;
+        margin: 0 0 1rem 0;
+    }
+    
+    /* Summary Card */
+    .summary-card {
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(10px);
         padding: 1.5rem;
         border-radius: 16px;
-        border-left: 5px solid {COLORS['soft_blue']};
-        box-shadow: 0 4px 15px {COLORS['shadow']};
+        border-left: 4px solid #99CDD8;
+        box-shadow: 0 4px 16px rgba(101, 113, 102, 0.08);
         margin: 1rem 0;
-    }}
-    .summary-card h4 {{
-        color: {COLORS['text']} !important;
+    }
+    .summary-card h4 {
+        color: #4a5548;
         margin: 0 0 0.5rem 0;
-    }}
-    .summary-card p {{
-        color: {COLORS['text_light']};
+        font-weight: 600;
+    }
+    .summary-card p {
+        color: #657166;
         margin: 0;
         line-height: 1.6;
-    }}
+    }
     
-    /* Category cards */
-    .category-card {{
-        background: {COLORS['cream']};
-        padding: 1rem;
+    /* Quote Card */
+    .quote-card {
+        background: rgba(255, 255, 255, 0.6);
+        padding: 1rem 1.2rem;
         border-radius: 12px;
-        border-left: 4px solid {COLORS['peach']};
-        margin: 0.5rem 0;
-    }}
-    
-    /* Quote cards */
-    .quote-card {{
-        background: {COLORS['white']};
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 3px solid {COLORS['sage']};
-        margin: 0.5rem 0;
+        border-left: 3px solid #F3C3B2;
+        margin: 0.6rem 0;
         font-style: italic;
-        color: {COLORS['text_light']};
-    }}
+        color: #657166;
+        font-size: 0.95rem;
+    }
     
-    /* Action items */
-    .action-item {{
-        background: {COLORS['white']};
-        padding: 0.8rem 1rem;
-        border-radius: 10px;
-        border-left: 4px solid {COLORS['soft_blue']};
-        margin: 0.5rem 0;
-        color: {COLORS['text']};
-    }}
-    
-    /* Welcome card */
-    .welcome-card {{
-        background: linear-gradient(135deg, {COLORS['cream']} 0%, {COLORS['peach']} 100%);
-        padding: 3rem;
-        border-radius: 20px;
-        text-align: center;
-        margin: 2rem 0;
-        box-shadow: 0 8px 32px {COLORS['shadow']};
-    }}
-    .welcome-card h2 {{
-        color: {COLORS['text']} !important;
+    /* Category Card */
+    .category-card {
+        background: rgba(255, 255, 255, 0.7);
+        padding: 1.2rem;
+        border-radius: 14px;
+        border-left: 4px solid #99CDD8;
+        margin: 0.8rem 0;
+        box-shadow: 0 2px 12px rgba(101, 113, 102, 0.06);
+    }
+    .category-card h5 {
+        color: #4a5548;
+        margin: 0 0 0.5rem 0;
+        font-weight: 600;
+    }
+    .category-card p {
+        color: #657166;
         margin: 0;
-    }}
-    .welcome-card p {{
-        color: {COLORS['text_light']};
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+    
+    /* Action Items */
+    .action-item {
+        background: rgba(255, 255, 255, 0.7);
+        padding: 1rem 1.2rem;
+        border-radius: 12px;
+        border-left: 4px solid #99CDD8;
+        margin: 0.5rem 0;
+        color: #4a5548;
+        font-weight: 500;
+    }
+    
+    /* Welcome Card */
+    .welcome-card {
+        background: rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        padding: 4rem 3rem;
+        border-radius: 24px;
+        text-align: center;
+        margin: 3rem auto;
+        max-width: 600px;
+        box-shadow: 0 8px 32px rgba(101, 113, 102, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    .welcome-card h2 {
+        color: #4a5548;
+        font-size: 1.8rem;
+        margin: 0;
+        font-weight: 600;
+    }
+    .welcome-card p {
+        color: #657166;
         margin: 1rem 0 0 0;
         font-size: 1.1rem;
-    }}
+    }
+    
+    /* Buttons - Gradient Glass */
+    .stButton > button {
+        background: linear-gradient(135deg, rgba(153, 205, 216, 0.9) 0%, rgba(243, 195, 178, 0.9) 100%) !important;
+        color: #4a5548 !important;
+        border: none !important;
+        border-radius: 14px !important;
+        padding: 0.8rem 1.8rem !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        box-shadow: 0 4px 16px rgba(153, 205, 216, 0.3) !important;
+        transition: all 0.3s ease !important;
+        backdrop-filter: blur(8px) !important;
+    }
+    .stButton > button:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 8px 24px rgba(153, 205, 216, 0.4) !important;
+    }
+    
+    /* Select boxes */
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.8) !important;
+        border: 1px solid rgba(207, 219, 196, 0.5) !important;
+        border-radius: 12px !important;
+        color: #657166 !important;
+    }
+    
+    /* File uploader */
+    [data-testid="stFileUploader"] {
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 14px;
+        padding: 1rem;
+        border: 2px dashed rgba(153, 205, 216, 0.5);
+    }
+    
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background: rgba(255, 255, 255, 0.7) !important;
+        border-radius: 12px !important;
+        color: #4a5548 !important;
+        font-weight: 500;
+    }
+    
+    /* Dataframes */
+    [data-testid="stDataFrame"] {
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 14px !important;
+        overflow: hidden;
+        box-shadow: 0 4px 16px rgba(101, 113, 102, 0.08);
+    }
+    
+    /* Success/Info boxes */
+    .stSuccess, .stInfo {
+        background: rgba(255, 255, 255, 0.7) !important;
+        border-radius: 12px !important;
+        color: #657166 !important;
+    }
+    
+    /* Dividers */
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(101, 113, 102, 0.2), transparent);
+        margin: 2rem 0;
+    }
+    
+    /* All headings */
+    h1, h2, h3, h4, h5, h6 {
+        color: #4a5548 !important;
+    }
+    
+    /* All text */
+    p, span, label, div {
+        color: #657166;
+    }
+    
+    /* Spinner */
+    .stSpinner > div {
+        border-top-color: #99CDD8 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -260,8 +305,6 @@ def load_summarizer():
     """Load the T5 summarization model (cached)."""
     try:
         from transformers import T5Tokenizer, T5ForConditionalGeneration
-        import torch
-        
         model_name = "t5-small"
         tokenizer = T5Tokenizer.from_pretrained(model_name)
         model = T5ForConditionalGeneration.from_pretrained(model_name)
@@ -275,174 +318,96 @@ def summarize_text(text, summarizer, max_len=150):
     """Generate summary for given text using T5."""
     if not summarizer or not text or len(text.strip()) < 50:
         return None
-    
     try:
         tokenizer = summarizer['tokenizer']
         model = summarizer['model']
-        
         input_text = f"summarize: {text[:1500]}"
         inputs = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True)
-        
-        outputs = model.generate(
-            inputs,
-            max_length=max_len,
-            min_length=30,
-            num_beams=4,
-            early_stopping=True,
-            no_repeat_ngram_size=2
-        )
-        
-        summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return summary
-    except Exception as e:
+        outputs = model.generate(inputs, max_length=max_len, min_length=30, num_beams=4, early_stopping=True, no_repeat_ngram_size=2)
+        return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    except:
         return None
 
 
 def generate_detailed_ai_summary(df, cluster_info, summarizer):
-    """Generate comprehensive AI summary by actually reading the reviews."""
-    
+    """Generate comprehensive AI summary."""
     report = {
-        'overall_summary': '',
-        'negative_summary': '',
-        'positive_summary': '',
-        'login_summary': '',
-        'bugs_summary': '',
-        'features_summary': '',
-        'messaging_summary': '',
-        'top_complaints': [],
-        'top_praises': [],
-        'action_items': []
+        'overall_summary': '', 'negative_summary': '', 'positive_summary': '',
+        'login_summary': '', 'bugs_summary': '', 'features_summary': '', 'messaging_summary': '',
+        'top_complaints': [], 'top_praises': [], 'action_items': []
     }
     
-    # 1. OVERALL SUMMARY
     all_reviews = df['content'].astype(str).tolist()[:50]
     combined_all = " | ".join([r[:150] for r in all_reviews if len(r) > 20])
-    
     if summarizer and combined_all:
-        report['overall_summary'] = summarize_text(
-            f"User reviews summary: {combined_all}", 
-            summarizer, max_len=200
-        ) or "Could not generate overall summary."
+        report['overall_summary'] = summarize_text(f"User reviews summary: {combined_all}", summarizer, max_len=200) or ""
     
-    # 2. NEGATIVE REVIEWS SUMMARY
     negative_df = df[df['sentiment'] == 'negative'] if 'sentiment' in df.columns else pd.DataFrame()
     if len(negative_df) > 0:
         neg_reviews = negative_df['content'].astype(str).tolist()[:40]
         combined_neg = " | ".join([r[:150] for r in neg_reviews if len(r) > 20])
-        
         if summarizer and combined_neg:
-            report['negative_summary'] = summarize_text(
-                f"Users are complaining that: {combined_neg}",
-                summarizer, max_len=200
-            ) or "Could not generate negative summary."
-        
+            report['negative_summary'] = summarize_text(f"Users are complaining: {combined_neg}", summarizer, max_len=200) or ""
         for review in neg_reviews[:5]:
-            if len(review) > 30:
-                report['top_complaints'].append(review[:200])
+            if len(review) > 30: report['top_complaints'].append(review[:200])
     
-    # 3. POSITIVE REVIEWS SUMMARY
     positive_df = df[df['sentiment'] == 'positive'] if 'sentiment' in df.columns else pd.DataFrame()
     if len(positive_df) > 0:
         pos_reviews = positive_df['content'].astype(str).tolist()[:30]
         combined_pos = " | ".join([r[:150] for r in pos_reviews if len(r) > 20])
-        
         if summarizer and combined_pos:
-            report['positive_summary'] = summarize_text(
-                f"Users love that: {combined_pos}",
-                summarizer, max_len=150
-            ) or "Could not generate positive summary."
-        
+            report['positive_summary'] = summarize_text(f"Users love: {combined_pos}", summarizer, max_len=150) or ""
         for review in pos_reviews[:3]:
-            if len(review) > 30:
-                report['top_praises'].append(review[:200])
+            if len(review) > 30: report['top_praises'].append(review[:200])
     
-    # 4. CATEGORY-SPECIFIC SUMMARIES
-    category_labels = {
-        'Login/Account Issues': 'login_summary',
-        'Performance/Bugs': 'bugs_summary',
-        'Feature Requests': 'features_summary',
-        'Notifications/Messaging': 'messaging_summary'
-    }
-    
+    category_labels = {'Login/Account Issues': 'login_summary', 'Performance/Bugs': 'bugs_summary',
+                       'Feature Requests': 'features_summary', 'Notifications/Messaging': 'messaging_summary'}
     for cluster_id, info in cluster_info.items():
         label = info.get('label', '')
         if label in category_labels:
-            texts = info.get('all_texts', info.get('sample_texts', []))
+            texts = info.get('all_texts', [])[:25]
             if texts:
-                combined = " | ".join([str(t)[:150] for t in texts[:25] if len(str(t)) > 20])
-                
+                combined = " | ".join([str(t)[:150] for t in texts if len(str(t)) > 20])
                 if summarizer and combined:
                     key = category_labels[label]
-                    prompt = {
-                        'login_summary': f"Users report login and account problems: {combined}",
-                        'bugs_summary': f"Users report bugs and performance issues: {combined}",
-                        'features_summary': f"Users are requesting these features: {combined}",
-                        'messaging_summary': f"Users complain about messaging and notifications: {combined}"
-                    }
-                    report[key] = summarize_text(
-                        prompt.get(key, combined),
-                        summarizer, max_len=150
-                    ) or f"Found {len(texts)} reviews about {label}"
+                    report[key] = summarize_text(f"Issues about {label}: {combined}", summarizer, max_len=150) or f"{len(texts)} reviews"
     
-    # 5. ACTION ITEMS
     if report['negative_summary']:
-        report['action_items'].append(f"🔴 Address complaints: {report['negative_summary'][:200]}")
-    
+        report['action_items'].append(f"🔴 Address: {report['negative_summary'][:150]}...")
     for label, key in category_labels.items():
         if report.get(key):
-            icon = {'login_summary': '🔐', 'bugs_summary': '🐛', 'features_summary': '✨', 'messaging_summary': '💬'}.get(key, '📌')
-            report['action_items'].append(f"{icon} {label}: {report[key][:150]}...")
+            icons = {'login_summary': '🔐', 'bugs_summary': '🐛', 'features_summary': '✨', 'messaging_summary': '💬'}
+            report['action_items'].append(f"{icons.get(key, '📌')} {label}: {report[key][:120]}...")
     
     return report
 
 
-# ============== DATA PROCESSING FUNCTIONS ==============
+# ============== DATA PROCESSING ==============
 
 def clean_text(text):
-    """Clean review text."""
-    if not isinstance(text, str):
-        return ""
+    if not isinstance(text, str): return ""
     text = text.lower()
     text = re.sub(r'http\S+|www\.\S+', '', text)
     text = re.sub(r'\S+@\S+', '', text)
     text = re.sub(r'[^\w\s.,!?\'\"-]', ' ', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
-
+    return re.sub(r'\s+', ' ', text).strip()
 
 def score_to_sentiment(score):
-    """Convert star rating to sentiment."""
     try:
         score = int(score)
-        if score <= 2:
-            return 'negative'
-        elif score == 3:
-            return 'neutral'
-        return 'positive'
-    except:
-        return 'neutral'
-
+        return 'negative' if score <= 2 else ('neutral' if score == 3 else 'positive')
+    except: return 'neutral'
 
 def extract_keywords(texts, top_n=5):
-    """Extract keywords from texts."""
-    stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-                 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
-                 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'it', 'its',
-                 'this', 'that', 'i', 'me', 'my', 'you', 'your', 'we', 'they', 'app',
-                 'not', 'just', 'very', 'much', 'really', 'can', 'get', 'use', 'one'}
-    
+    stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'it', 'its', 'this', 'that', 'i', 'me', 'my', 'you', 'your', 'we', 'they', 'app', 'not', 'just', 'very', 'much', 'really', 'can', 'get', 'use', 'one'}
     word_counts = Counter()
     for text in texts:
-        words = re.findall(r'\b[a-z]{3,}\b', str(text).lower())
-        words = [w for w in words if w not in stopwords]
+        words = [w for w in re.findall(r'\b[a-z]{3,}\b', str(text).lower()) if w not in stopwords]
         word_counts.update(words)
     return [word for word, _ in word_counts.most_common(top_n)]
 
-
 def simple_cluster(texts, original_reviews, n_clusters=6):
-    """Simple keyword-based clustering."""
     clusters = {i: {'cleaned': [], 'original': []} for i in range(n_clusters)}
-    
     issue_keywords = [
         ['login', 'account', 'password', 'sign', 'ban', 'banned', 'block', 'access'],
         ['slow', 'lag', 'loading', 'crash', 'freeze', 'bug', 'error', 'stuck'],
@@ -451,7 +416,6 @@ def simple_cluster(texts, original_reviews, n_clusters=6):
         ['ads', 'advertisement', 'spam', 'scam', 'fake', 'privacy'],
         ['feature', 'need', 'want', 'please', 'add', 'missing', 'wish']
     ]
-    
     for i, text in enumerate(texts):
         text_lower = str(text).lower()
         orig = original_reviews[i] if i < len(original_reviews) else text
@@ -467,392 +431,244 @@ def simple_cluster(texts, original_reviews, n_clusters=6):
             clusters[n_clusters - 1]['original'].append(orig)
     
     cluster_info = {}
-    labels = ['Login/Account Issues', 'Performance/Bugs', 'Updates/Installation',
-              'Notifications/Messaging', 'Ads/Spam/Privacy', 'Feature Requests']
-    
+    labels = ['Login/Account Issues', 'Performance/Bugs', 'Updates/Installation', 'Notifications/Messaging', 'Ads/Spam/Privacy', 'Feature Requests']
     for i in range(n_clusters):
         if clusters[i]['cleaned']:
-            cluster_info[i] = {
-                'label': labels[i] if i < len(labels) else f'Topic {i}',
-                'keywords': extract_keywords(clusters[i]['cleaned']),
-                'count': len(clusters[i]['cleaned']),
-                'sample_texts': clusters[i]['cleaned'][:10],
-                'all_texts': clusters[i]['cleaned'],
-                'original_texts': clusters[i]['original']
-            }
-    
+            cluster_info[i] = {'label': labels[i] if i < len(labels) else f'Topic {i}', 'keywords': extract_keywords(clusters[i]['cleaned']),
+                              'count': len(clusters[i]['cleaned']), 'all_texts': clusters[i]['cleaned'], 'original_texts': clusters[i]['original']}
     return cluster_info
 
-
 def process_data(df, sentiment_filter="All", app_filter="All"):
-    """Full processing pipeline with filters."""
     df = df.copy()
-    
     if 'content' not in df.columns:
-        text_cols = [col for col in df.columns if 'text' in col.lower() or 'review' in col.lower() or 'content' in col.lower()]
-        if text_cols:
-            df['content'] = df[text_cols[0]]
-        else:
-            return None
+        text_cols = [col for col in df.columns if any(x in col.lower() for x in ['text', 'review', 'content'])]
+        if text_cols: df['content'] = df[text_cols[0]]
+        else: return None
     
     df = df.dropna(subset=['content'])
     df = df[df['content'].astype(str).str.strip() != ''].copy()
     df['cleaned_content'] = df['content'].apply(clean_text)
     df = df[df['cleaned_content'].str.strip() != ''].copy()
-    
-    if 'score' in df.columns:
-        df['sentiment'] = df['score'].apply(score_to_sentiment)
-    else:
-        df['sentiment'] = 'neutral'
+    df['sentiment'] = df['score'].apply(score_to_sentiment) if 'score' in df.columns else 'neutral'
     
     if app_filter != "All" and 'app_id' in df.columns:
         df = df[df['app_id'] == app_filter].copy()
     
     total = len(df)
-    if total == 0:
-        return None
+    if total == 0: return None
     
-    positive_count = len(df[df['sentiment'] == 'positive'])
-    negative_count = len(df[df['sentiment'] == 'negative'])
-    neutral_count = len(df[df['sentiment'] == 'neutral'])
-    
-    display_df = df.copy()
-    if sentiment_filter != "All":
-        display_df = df[df['sentiment'] == sentiment_filter.lower()].copy()
-    
+    pos, neg, neu = len(df[df['sentiment'] == 'positive']), len(df[df['sentiment'] == 'negative']), len(df[df['sentiment'] == 'neutral'])
     negative_df = df[df['sentiment'] == 'negative']
-    
-    cluster_info = simple_cluster(
-        negative_df['cleaned_content'].tolist(),
-        negative_df['content'].tolist()
-    ) if len(negative_df) > 0 else {}
-    
-    summary = {
-        'total_reviews': total,
-        'positive_count': positive_count,
-        'negative_count': negative_count,
-        'neutral_count': neutral_count,
-        'positive_percentage': round(positive_count / total * 100, 1),
-        'negative_percentage': round(negative_count / total * 100, 1),
-        'health_score': round(100 - (negative_count / total * 100), 1)
-    }
-    
-    top_issues = sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)[:6]
-    
-    sample_df = display_df if sentiment_filter != "All" else negative_df
-    sample_complaints = []
-    for _, row in sample_df.head(15).iterrows():
-        sample_complaints.append({
-            'Review': str(row.get('content', ''))[:200],
-            'Score': row.get('score', 'N/A'),
-            'Sentiment': row.get('sentiment', 'N/A').title()
-        })
+    cluster_info = simple_cluster(negative_df['cleaned_content'].tolist(), negative_df['content'].tolist()) if len(negative_df) > 0 else {}
     
     return {
-        'summary': summary,
-        'top_issues': top_issues,
-        'sample_complaints': sample_complaints,
-        'cluster_info': cluster_info,
-        'filtered_count': len(display_df),
-        'processed_df': df
+        'summary': {'total_reviews': total, 'positive_count': pos, 'negative_count': neg, 'neutral_count': neu,
+                   'positive_percentage': round(pos/total*100, 1), 'negative_percentage': round(neg/total*100, 1),
+                   'health_score': round(100 - (neg/total*100), 1)},
+        'top_issues': sorted(cluster_info.values(), key=lambda x: x['count'], reverse=True)[:6],
+        'cluster_info': cluster_info, 'processed_df': df
     }
 
-
 def load_sample_data():
-    """Load sample data from various paths."""
-    data_paths = [
-        'data/Training_Data.csv',
-        './data/Training_Data.csv',
-        os.path.join(os.path.dirname(__file__), 'data', 'Training_Data.csv'),
-    ]
-    for path in data_paths:
+    for path in ['data/Training_Data.csv', './data/Training_Data.csv']:
         if os.path.exists(path):
-            try:
-                return pd.read_csv(path)
-            except:
-                continue
+            try: return pd.read_csv(path)
+            except: continue
     return None
 
 
 # ============== UI COMPONENTS ==============
 
-def render_header():
+def render_hero():
     st.markdown("""
-        <div class="main-header">
-            <h1>📊 AI Product Feedback Analyzer</h1>
-            <p>Transform user reviews into actionable product insights</p>
-        </div>
+    <div class="hero-card">
+        <h1>📊 AI Product Feedback Analyzer</h1>
+        <p>Turn thousands of user reviews into clear, actionable product insights</p>
+    </div>
     """, unsafe_allow_html=True)
-
 
 def render_kpi_cards(summary):
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
-        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['soft_blue']} 0%, {COLORS['mint']} 100%);">
+        <div class="kpi-card">
+            <div class="kpi-icon">📝</div>
             <div class="kpi-value">{summary.get('total_reviews', 0):,}</div>
-            <div class="kpi-label">📝 Total Reviews</div>
+            <div class="kpi-label">Total Reviews</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
-        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['sage']} 0%, {COLORS['mint']} 100%);">
+        <div class="kpi-card">
+            <div class="kpi-icon">😊</div>
             <div class="kpi-value">{summary.get('positive_percentage', 0)}%</div>
-            <div class="kpi-label">😊 Positive</div>
+            <div class="kpi-label">Positive</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown(f"""
-        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['peach']} 0%, {COLORS['cream']} 100%);">
+        <div class="kpi-card">
+            <div class="kpi-icon">😟</div>
             <div class="kpi-value">{summary.get('negative_percentage', 0)}%</div>
-            <div class="kpi-label">😟 Negative</div>
+            <div class="kpi-label">Negative</div>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
-        health = summary.get('health_score', 0)
         st.markdown(f"""
-        <div class="kpi-card" style="background: linear-gradient(135deg, {COLORS['cream']} 0%, {COLORS['sage']} 100%);">
-            <div class="kpi-value">{health}%</div>
-            <div class="kpi-label">💪 Health Score</div>
+        <div class="kpi-card">
+            <div class="kpi-icon">💪</div>
+            <div class="kpi-value">{summary.get('health_score', 0)}%</div>
+            <div class="kpi-label">Health Score</div>
         </div>
         """, unsafe_allow_html=True)
 
-
 def render_sentiment_chart(summary):
-    st.markdown(f"<h3 style='color: {COLORS['text']};'>📊 Sentiment Distribution</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown("<h3>📊 Sentiment Distribution</h3>", unsafe_allow_html=True)
     
     fig = go.Figure(data=[go.Pie(
         labels=['Positive', 'Neutral', 'Negative'],
         values=[summary.get('positive_count', 0), summary.get('neutral_count', 0), summary.get('negative_count', 0)],
-        hole=0.4,
-        marker_colors=[COLORS['sage'], COLORS['soft_blue'], COLORS['peach']],
+        hole=0.45,
+        marker_colors=['#CFDBC4', '#99CDD8', '#F3C3B2'],
         textinfo='label+percent',
-        textfont=dict(color=COLORS['text'], size=14)
+        textfont=dict(color='#4a5548', size=13, family='Inter')
     )])
-    
-    fig.update_layout(
-        showlegend=True,
-        legend=dict(font=dict(color=COLORS['text'])),
-        margin=dict(t=20, b=60, l=20, r=20),
-        height=400,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
+    fig.update_layout(showlegend=True, legend=dict(font=dict(color='#657166', size=12)),
+                     margin=dict(t=10, b=10, l=10, r=10), height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
-
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def render_issues_chart(top_issues):
-    st.markdown(f"<h3 style='color: {COLORS['text']};'>🎯 Top Complaint Categories</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown("<h3>🎯 Top Complaint Categories</h3>", unsafe_allow_html=True)
     
     if not top_issues:
         st.info("No issues found.")
+        st.markdown('</div>', unsafe_allow_html=True)
         return
     
-    labels = [issue.get('label', 'Unknown')[:25] for issue in top_issues]
+    labels = [issue.get('label', 'Unknown')[:20] for issue in top_issues]
     counts = [issue.get('count', 0) for issue in top_issues]
-    
-    # Alternate colors from palette
-    bar_colors = [COLORS['peach'], COLORS['soft_blue'], COLORS['sage'], COLORS['cream'], COLORS['mint'], COLORS['peach']]
+    colors = ['#F3C3B2', '#99CDD8', '#CFDBC4', '#FDE8D3', '#DAEBE3', '#F3C3B2']
     
     fig = go.Figure(data=[go.Bar(
-        x=counts, y=labels, orientation='h',
-        marker=dict(color=bar_colors[:len(labels)]),
-        text=counts, textposition='outside',
-        textfont=dict(color=COLORS['text'])
+        x=counts, y=labels, orientation='h', marker=dict(color=colors[:len(labels)], line=dict(width=0)),
+        text=counts, textposition='outside', textfont=dict(color='#4a5548', size=12, family='Inter')
     )])
-    
-    fig.update_layout(
-        xaxis=dict(title_font=dict(color=COLORS['text']), tickfont=dict(color=COLORS['text'])),
-        yaxis=dict(autorange="reversed", tickfont=dict(color=COLORS['text'])),
-        margin=dict(t=20, b=40, l=160, r=40),
-        height=400,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)'
-    )
+    fig.update_layout(xaxis=dict(tickfont=dict(color='#657166'), showgrid=False),
+                     yaxis=dict(autorange="reversed", tickfont=dict(color='#4a5548', size=11)),
+                     margin=dict(t=10, b=30, l=130, r=50), height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
     st.plotly_chart(fig, use_container_width=True)
-
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def render_ai_summary(report):
-    """Render the detailed AI summary with pastel styling."""
     st.markdown("---")
-    st.markdown(f"<h2 style='color: {COLORS['text']};'>🤖 AI-Generated Review Summary</h2>", unsafe_allow_html=True)
-    st.caption("Based on analysis of actual user reviews")
+    st.markdown("<h2 style='color: #4a5548;'>🤖 AI-Generated Insights</h2>", unsafe_allow_html=True)
     
-    # Overall Summary
     if report.get('overall_summary'):
-        st.markdown(f"""
-        <div class="summary-card">
-            <h4>📋 Overall Summary</h4>
-            <p>{report['overall_summary']}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<div class="summary-card"><h4>📋 Overall Summary</h4><p>{report['overall_summary']}</p></div>""", unsafe_allow_html=True)
     
-    # Two columns for Negative and Positive
     col1, col2 = st.columns(2)
-    
     with col1:
-        st.markdown(f"<h4 style='color: {COLORS['text']};'>😟 What Users Are Complaining About</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #4a5548;'>😟 User Complaints</h4>", unsafe_allow_html=True)
         if report.get('negative_summary'):
-            st.markdown(f"""
-            <div class="category-card" style="border-left-color: {COLORS['peach']};">
-                <p style="color: {COLORS['text']}; margin: 0;">{report['negative_summary']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        if report.get('top_complaints'):
-            st.markdown(f"<p style='color: {COLORS['text']}; font-weight: 600;'>💬 Sample Complaints:</p>", unsafe_allow_html=True)
-            for complaint in report['top_complaints'][:3]:
-                st.markdown(f"""<div class="quote-card">"{complaint}"</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="category-card" style="border-left-color: #F3C3B2;"><p>{report['negative_summary']}</p></div>""", unsafe_allow_html=True)
+        for c in report.get('top_complaints', [])[:2]:
+            st.markdown(f"""<div class="quote-card">"{c}"</div>""", unsafe_allow_html=True)
     
     with col2:
-        st.markdown(f"<h4 style='color: {COLORS['text']};'>😊 What Users Love About the App</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #4a5548;'>😊 User Praises</h4>", unsafe_allow_html=True)
         if report.get('positive_summary'):
-            st.markdown(f"""
-            <div class="category-card" style="border-left-color: {COLORS['sage']};">
-                <p style="color: {COLORS['text']}; margin: 0;">{report['positive_summary']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        if report.get('top_praises'):
-            st.markdown(f"<p style='color: {COLORS['text']}; font-weight: 600;'>💬 Sample Praises:</p>", unsafe_allow_html=True)
-            for praise in report['top_praises'][:3]:
-                st.markdown(f"""<div class="quote-card" style="border-left-color: {COLORS['sage']};">"{praise}"</div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="category-card" style="border-left-color: #CFDBC4;"><p>{report['positive_summary']}</p></div>""", unsafe_allow_html=True)
+        for p in report.get('top_praises', [])[:2]:
+            st.markdown(f"""<div class="quote-card" style="border-left-color: #CFDBC4;">"{p}"</div>""", unsafe_allow_html=True)
     
-    st.markdown("---")
-    
-    # Category-wise summaries
-    st.markdown(f"<h4 style='color: {COLORS['text']};'>📂 Category-Wise Summary</h4>", unsafe_allow_html=True)
-    
-    categories = [
-        ('🔐 Login/Account', report.get('login_summary'), COLORS['peach']),
-        ('🐛 Bugs & Performance', report.get('bugs_summary'), COLORS['soft_blue']),
-        ('✨ Feature Requests', report.get('features_summary'), COLORS['sage']),
-        ('💬 Messaging Issues', report.get('messaging_summary'), COLORS['cream']),
-    ]
-    
+    st.markdown("<h4 style='color: #4a5548; margin-top: 1.5rem;'>📂 Category Breakdown</h4>", unsafe_allow_html=True)
+    cats = [('🔐 Login', report.get('login_summary'), '#F3C3B2'), ('🐛 Bugs', report.get('bugs_summary'), '#99CDD8'),
+            ('✨ Features', report.get('features_summary'), '#CFDBC4'), ('💬 Messaging', report.get('messaging_summary'), '#FDE8D3')]
     cols = st.columns(2)
-    for i, (title, summary, color) in enumerate(categories):
+    for i, (title, summary, color) in enumerate(cats):
         if summary:
             with cols[i % 2]:
-                st.markdown(f"""
-                <div class="category-card" style="border-left-color: {color}; background: {COLORS['white']};">
-                    <h5 style="color: {COLORS['text']}; margin: 0 0 0.5rem 0;">{title}</h5>
-                    <p style="color: {COLORS['text_light']}; margin: 0; font-size: 0.95rem;">{summary}</p>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div class="category-card" style="border-left-color: {color};"><h5>{title}</h5><p>{summary}</p></div>""", unsafe_allow_html=True)
     
-    # Action Items
     if report.get('action_items'):
-        st.markdown("---")
-        st.markdown(f"<h4 style='color: {COLORS['text']};'>🎯 Key Action Items</h4>", unsafe_allow_html=True)
-        for item in report['action_items'][:5]:
+        st.markdown("<h4 style='color: #4a5548; margin-top: 1.5rem;'>🎯 Action Items</h4>", unsafe_allow_html=True)
+        for item in report['action_items'][:4]:
             st.markdown(f"""<div class="action-item">{item}</div>""", unsafe_allow_html=True)
 
-
 def render_category_details(top_issues):
-    """Render expandable sections for each category with ALL reviews."""
-    st.markdown(f"<h3 style='color: {COLORS['text']};'>📂 Reviews by Category</h3>", unsafe_allow_html=True)
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown("<h3>📂 Reviews by Category</h3>", unsafe_allow_html=True)
     
-    if not top_issues:
-        st.info("No categories found.")
-        return
-    
-    icons = {
-        'Login/Account Issues': '🔐',
-        'Performance/Bugs': '🐛',
-        'Updates/Installation': '📥',
-        'Notifications/Messaging': '💬',
-        'Ads/Spam/Privacy': '🚫',
-        'Feature Requests': '✨'
-    }
+    icons = {'Login/Account Issues': '🔐', 'Performance/Bugs': '🐛', 'Updates/Installation': '📥',
+             'Notifications/Messaging': '💬', 'Ads/Spam/Privacy': '🚫', 'Feature Requests': '✨'}
     
     for issue in top_issues:
-        label = issue.get('label', 'Unknown')
-        icon = icons.get(label, '📌')
-        count = issue.get('count', 0)
-        keywords = issue.get('keywords', [])
+        label, count = issue.get('label', 'Unknown'), issue.get('count', 0)
         all_texts = issue.get('original_texts', issue.get('all_texts', []))
-        
-        with st.expander(f"{icon} {label} ({count} reviews)", expanded=False):
-            if keywords:
-                st.markdown(f"**🏷️ Keywords:** {', '.join(keywords)}")
-            
-            st.markdown("---")
-            
+        with st.expander(f"{icons.get(label, '📌')} {label} ({count} reviews)"):
+            if issue.get('keywords'):
+                st.markdown(f"**🏷️ Keywords:** {', '.join(issue['keywords'])}")
             if all_texts:
-                reviews_df = pd.DataFrame({
-                    '#': range(1, len(all_texts) + 1),
-                    'Review': [str(text)[:500] for text in all_texts]
-                })
-                st.dataframe(reviews_df, use_container_width=True, hide_index=True, height=400)
-                st.success(f"Showing all {len(all_texts)} reviews in this category")
+                st.dataframe(pd.DataFrame({'#': range(1, len(all_texts)+1), 'Review': [str(t)[:400] for t in all_texts]}),
+                           use_container_width=True, hide_index=True, height=350)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============== MAIN APP ==============
 
 def main():
-    render_header()
+    render_hero()
     
-    if 'df' not in st.session_state:
-        st.session_state.df = None
-    if 'ai_report' not in st.session_state:
-        st.session_state.ai_report = None
-    if 'analyzed' not in st.session_state:
-        st.session_state.analyzed = False
+    if 'df' not in st.session_state: st.session_state.df = None
+    if 'ai_report' not in st.session_state: st.session_state.ai_report = None
+    if 'analyzed' not in st.session_state: st.session_state.analyzed = False
     
     # Sidebar
     with st.sidebar:
-        st.markdown(f"<h2 style='color: {COLORS['text']};'>📁 Data Source</h2>", unsafe_allow_html=True)
-        
-        data_source = st.radio(
-            "Choose data source:",
-            ["📊 Sample Dataset", "📤 Upload CSV"],
-            index=0
-        )
+        st.markdown("## 📂 Data Source")
+        data_source = st.radio("Choose:", ["📊 Sample Dataset", "📤 Upload CSV"], index=0, label_visibility="collapsed")
         
         if data_source == "📤 Upload CSV":
-            uploaded_file = st.file_uploader("Upload CSV", type=['csv'])
-            if uploaded_file:
-                st.session_state.df = pd.read_csv(uploaded_file)
+            uploaded = st.file_uploader("Upload", type=['csv'], label_visibility="collapsed")
+            if uploaded:
+                st.session_state.df = pd.read_csv(uploaded)
                 st.session_state.ai_report = None
                 st.session_state.analyzed = False
-                st.success(f"✅ {len(st.session_state.df):,} reviews loaded")
+                st.success(f"✅ {len(st.session_state.df):,} reviews")
         else:
             if st.session_state.df is None:
                 st.session_state.df = load_sample_data()
             if st.session_state.df is not None:
-                st.success(f"✅ {len(st.session_state.df):,} reviews ready")
+                st.success(f"✅ {len(st.session_state.df):,} reviews")
         
-        st.divider()
-        
-        st.markdown(f"<h3 style='color: {COLORS['text']};'>🔍 Filters</h3>", unsafe_allow_html=True)
+        st.markdown("---")
+        st.markdown("## 🔍 Filters")
         sentiment_filter = st.selectbox("Sentiment", ["All", "Positive", "Neutral", "Negative"])
-        
         app_filter = "All"
         if st.session_state.df is not None and 'app_id' in st.session_state.df.columns:
-            apps = ["All"] + list(st.session_state.df['app_id'].dropna().unique())
-            app_filter = st.selectbox("App", apps)
+            app_filter = st.selectbox("App", ["All"] + list(st.session_state.df['app_id'].dropna().unique()))
         
-        st.divider()
-        
-        # Analyze Button
+        st.markdown("---")
         if st.session_state.df is not None:
-            if st.button("🚀 Start Analysis", type="primary", use_container_width=True):
+            if st.button("🚀 Analyze Reviews", type="primary", use_container_width=True):
                 st.session_state.analyzed = True
                 st.rerun()
         
-        st.divider()
-        st.caption("v3.0 - Pastel UI")
+        st.markdown("---")
+        st.caption("v4.0 • Premium UI")
     
-    # Main content
+    # Main Content
     df = st.session_state.df
     
     if df is not None and st.session_state.analyzed:
-        with st.spinner("🔍 Analyzing reviews..."):
+        with st.spinner("🔍 Analyzing user feedback..."):
             results = process_data(df, sentiment_filter, app_filter)
         
         if results:
@@ -860,60 +676,37 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             
             col1, col2 = st.columns(2)
-            with col1:
-                render_sentiment_chart(results['summary'])
-            with col2:
-                render_issues_chart(results['top_issues'])
+            with col1: render_sentiment_chart(results['summary'])
+            with col2: render_issues_chart(results['top_issues'])
             
-            # AI Summary Button
             st.markdown("---")
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
-                if st.button("🤖 Generate Detailed AI Summary", type="primary", use_container_width=True):
-                    with st.spinner("🧠 Reading all reviews and generating summary..."):
-                        summarizer = load_summarizer()
-                        report = generate_detailed_ai_summary(
-                            results['processed_df'],
-                            results['cluster_info'],
-                            summarizer
-                        )
-                        st.session_state.ai_report = report
+                if st.button("🤖 Generate AI Summary", type="primary", use_container_width=True):
+                    with st.spinner("🧠 Generating insights..."):
+                        st.session_state.ai_report = generate_detailed_ai_summary(results['processed_df'], results['cluster_info'], load_summarizer())
             
-            # Display AI Summary
             if st.session_state.ai_report:
                 render_ai_summary(st.session_state.ai_report)
             
-            st.divider()
+            st.markdown("---")
             render_category_details(results['top_issues'])
             
-            st.divider()
-            
-            # All Reviews section
-            st.markdown(f"<h3 style='color: {COLORS['text']};'>📋 All Reviews ({sentiment_filter})</h3>", unsafe_allow_html=True)
-            if 'processed_df' in results and len(results['processed_df']) > 0:
-                display_df = results['processed_df'].copy()
-                if sentiment_filter != "All":
-                    display_df = display_df[display_df['sentiment'] == sentiment_filter.lower()]
-                
-                if len(display_df) > 0:
-                    all_reviews_df = pd.DataFrame({
-                        '#': range(1, len(display_df) + 1),
-                        'Review': display_df['content'].astype(str).tolist(),
-                        'Score': display_df['score'].tolist() if 'score' in display_df.columns else ['N/A'] * len(display_df),
-                        'Sentiment': display_df['sentiment'].str.title().tolist() if 'sentiment' in display_df.columns else ['N/A'] * len(display_df)
-                    })
-                    st.dataframe(all_reviews_df, use_container_width=True, hide_index=True, height=500)
-                    st.success(f"Showing all {len(display_df)} reviews")
-                else:
-                    st.info("No reviews match the current filter.")
+            st.markdown("---")
+            st.markdown('<div class="section-card">', unsafe_allow_html=True)
+            st.markdown(f"<h3>📋 All Reviews ({sentiment_filter})</h3>", unsafe_allow_html=True)
+            display_df = results['processed_df'].copy()
+            if sentiment_filter != "All":
+                display_df = display_df[display_df['sentiment'] == sentiment_filter.lower()]
+            if len(display_df) > 0:
+                st.dataframe(pd.DataFrame({'#': range(1, len(display_df)+1), 'Review': display_df['content'].astype(str).tolist(),
+                            'Score': display_df['score'].tolist() if 'score' in display_df.columns else ['N/A']*len(display_df),
+                            'Sentiment': display_df['sentiment'].str.title().tolist()}), use_container_width=True, hide_index=True, height=450)
+                st.success(f"📊 Showing all {len(display_df)} reviews")
+            st.markdown('</div>', unsafe_allow_html=True)
+    
     elif df is not None and not st.session_state.analyzed:
-        # Show welcome message before analysis
-        st.markdown("""
-        <div class="welcome-card">
-            <h2>👈 Click "Start Analysis" to Begin</h2>
-            <p>Select your data source and filters, then click the button in the sidebar to analyze your reviews.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("""<div class="welcome-card"><h2>👈 Click "Analyze Reviews" to Begin</h2><p>Select your data source, apply filters, then start the analysis.</p></div>""", unsafe_allow_html=True)
     else:
         st.info("👈 Select a data source to get started!")
 

@@ -42,26 +42,45 @@ st.markdown("""
 
 @st.cache_resource
 def load_summarizer():
-    """Load the summarization model (cached)."""
+    """Load the T5 summarization model (cached)."""
     try:
-        from transformers import pipeline
-        summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6", device=-1)
-        return summarizer
+        from transformers import T5Tokenizer, T5ForConditionalGeneration
+        import torch
+        
+        model_name = "t5-small"
+        tokenizer = T5Tokenizer.from_pretrained(model_name)
+        model = T5ForConditionalGeneration.from_pretrained(model_name)
+        return {'tokenizer': tokenizer, 'model': model}
     except Exception as e:
-        st.warning(f"AI Model not available: {e}")
+        st.warning(f"AI Model loading failed: {e}")
         return None
 
 
-def summarize_text(text, summarizer, max_len=150, min_len=40):
-    """Generate summary for given text."""
-    if not summarizer or not text or len(text.strip()) < 100:
+def summarize_text(text, summarizer, max_len=150):
+    """Generate summary for given text using T5."""
+    if not summarizer or not text or len(text.strip()) < 50:
         return None
     
     try:
-        # Truncate to model limit
-        text = text[:1024]
-        result = summarizer(text, max_length=max_len, min_length=min_len, do_sample=False)
-        return result[0]['summary_text']
+        tokenizer = summarizer['tokenizer']
+        model = summarizer['model']
+        
+        # Prepare input for T5
+        input_text = f"summarize: {text[:1500]}"
+        inputs = tokenizer.encode(input_text, return_tensors="pt", max_length=512, truncation=True)
+        
+        # Generate summary
+        outputs = model.generate(
+            inputs,
+            max_length=max_len,
+            min_length=30,
+            num_beams=4,
+            early_stopping=True,
+            no_repeat_ngram_size=2
+        )
+        
+        summary = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return summary
     except Exception as e:
         return None
 
